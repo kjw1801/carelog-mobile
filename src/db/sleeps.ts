@@ -28,6 +28,27 @@ export function getActiveSleep(db: SQLiteDatabase): Promise<Sleep | null> {
   );
 }
 
+/**
+ * 주어진 구간과 겹치는 수면. 전체를 다 읽지 않고 경계로 걸러낸다.
+ *
+ * 진행 중인 수면(`ended_at IS NULL`)은 아직 끝나지 않았으므로, 시작이 구간 끝보다
+ * 앞이기만 하면 겹친다. 따라서 지금 진행 중인 수면은 항상 오늘 결과에 들어온다.
+ */
+export function listSleepsOverlapping(
+  db: SQLiteDatabase,
+  rangeStart: number,
+  rangeEnd: number
+): Promise<Sleep[]> {
+  return db.getAllAsync<Sleep>(
+    `SELECT ${COLUMNS} FROM sleeps
+      WHERE started_at < ?
+        AND (ended_at IS NULL OR ended_at > ?)
+      ORDER BY started_at`,
+    rangeEnd,
+    rangeStart
+  );
+}
+
 export async function startSleep(db: SQLiteDatabase, startedAt: number): Promise<void> {
   const now = Date.now();
   await db.runAsync(

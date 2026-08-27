@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -19,7 +19,14 @@ import {
   type Feeding,
   type TodaySummary,
 } from '@/db/feedings';
-import { endSleep, getActiveSleep, startSleep, type Sleep } from '@/db/sleeps';
+import {
+  endSleep,
+  getActiveSleep,
+  listSleepsOverlapping,
+  startSleep,
+  type Sleep,
+} from '@/db/sleeps';
+import { calculateSleepDuration } from '@/lib/sleep';
 import { formatDuration, formatElapsed, formatTimeOfDay, todayRange } from '@/lib/time';
 
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
@@ -29,7 +36,7 @@ export default function TodayScreen() {
   const [last, setLast] = useState<Feeding | null>(null);
   const [summary, setSummary] = useState<TodaySummary>({ count: 0, amountMl: null });
   const [diaperCount, setDiaperCount] = useState(0);
-  const [activeSleep, setActiveSleep] = useState<Sleep | null>(null);
+  const [todaySleeps, setTodaySleeps] = useState<Sleep[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [toggling, setToggling] = useState(false);
   // setState는 다음 렌더에야 반영되므로 연타를 막지 못한다. 실제 잠금은 ref로 걸고,
@@ -40,24 +47,44 @@ export default function TodayScreen() {
   // 매분 다시 돌지 않고, 자정을 넘기면 값이 바뀌어 다시 조회된다.
   const dayStart = todayRange(new Date(now)).start;
 
+  // 진행 중인 수면은 정의상 항상 오늘과 겹치므로 목록에서 파생한다.
+  // 별도 상태로 들면 두 값이 어긋날 수 있다.
+  const activeSleep = todaySleeps.find((s) => s.ended_at === null) ?? null;
+
+  // 합계는 now가 바뀔 때마다 다시 계산한다. 조회 시점에 숫자로 접어두면 진행 중인
+  // 수면의 기여분이 얼어붙는다. 1분 타이머가 now를 갱신하므로 DB는 매분 조회하지 않는다.
+  //
+  // useMemo를 빼면 React Compiler가 이 컴포넌트의 최적화를 포기한다
+  // (ESLint react-hooks/preserve-manual-memoization). 지우지 말 것.
+  const sleepMs = useMemo(
+    () =>
+      calculateSleepDuration(
+        todaySleeps,
+        dayStart,
+        todayRange(new Date(dayStart)).end,
+        now
+      ),
+    [todaySleeps, dayStart, now]
+  );
+
   // 조회와 반영은 분리해 둔다. 한 함수에서 setState까지 하면 호출부의
   // alive 검사가 이미 늦어 아무것도 막지 못한다.
   const fetchAll = useCallback(async () => {
     const { start, end } = todayRange(new Date(dayStart));
-    const [lastRow, todayRow, diapers, sleep] = await Promise.all([
+    const [lastRow, todayRow, diapers, sleeps] = await Promise.all([
       getLastFeeding(db),
       getTodaySummary(db, start, end),
       getTodayDiaperCount(db, start, end),
-      getActiveSleep(db),
+      listSleepsOverlapping(db, start, end),
     ]);
-    return { lastRow, todayRow, diapers, sleep };
+    return { lastRow, todayRow, diapers, sleeps };
   }, [db, dayStart]);
 
   const apply = useCallback((data: Awaited<ReturnType<typeof fetchAll>>) => {
     setLast(data.lastRow);
     setSummary(data.todayRow);
     setDiaperCount(data.diapers);
-    setActiveSleep(data.sleep);
+    setTodaySleeps(data.sleeps);
   }, []);
 
   // 저장·수정·삭제 후 모달이 닫히면 이 화면이 포커스를 받는다. 그때 다시 조회한다.
@@ -66,9 +93,12 @@ export default function TodayScreen() {
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      fetchAll().then((data) => {
-        if (alive) apply(data);
-      });
+      // 조회에 실패하면 화면을 그대로 둔다. 다음 포커스나 날짜 변경 때 다시 읽는다.
+      fetchAll()
+        .then((data) => {
+          if (alive) apply(data);
+        })
+        .catch(() => {});
       return () => {
         alive = false;
       };
@@ -115,15 +145,24 @@ export default function TodayScreen() {
           // 중복이라고 말한다.
           const existing = await getActiveSleep(db).catch(() => null);
           if (existing) {
+            // 화면이 낡아서 눌린 것이다. 여기서 return하면 계속 '수면 시작'으로
+            // 남아 누를 때마다 같은 오류만 반복된다.
+            //
+            // 아래 재조회로 맞추되, 그것마저 실패해도 버튼이 멈추지 않도록
+            // 찾은 행을 먼저 넣는다. 목록을 통째로 갈아치우면 오늘 끝난 수면이
+            // 빠져 합계가 잠깐 줄어들므로 병합한다.
+            setTodaySleeps((prev) =>
+              prev.some((row) => row.id === existing.id) ? prev : [...prev, existing]
+            );
             Alert.alert('이미 진행 중인 수면이 있습니다', '먼저 종료해 주세요.');
-            setActiveSleep(existing);
           } else {
             Alert.alert('수면을 시작하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+            return;
           }
-          return;
         }
       }
-      // 쓰기는 성공했으므로 갱신 실패는 알리지 않는다. 다음 포커스에서 다시 읽는다.
+      // 성공했든 중복이었든 화면을 다시 맞춘다. 갱신 실패는 알리지 않는다 —
+      // 다음 포커스나 날짜 변경 때 다시 읽는다.
       const data = await fetchAll().catch(() => null);
       if (data) apply(data);
     } finally {
@@ -175,14 +214,26 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        {/* 오늘 수유량을 한 번도 입력하지 않았다면 0ml이 아니라 "기록 없음"이다. */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>입력된 수유량</Text>
-          {summary.amountMl === null ? (
-            <Text style={styles.cardEmpty}>기록 없음</Text>
-          ) : (
-            <Text style={styles.cardValue}>{summary.amountMl}ml</Text>
-          )}
+        <View style={styles.cardRow}>
+          {/* 겹치는 수면이 하나도 없으면 0시간이 아니라 "기록 없음"이다.
+              안 잔 것과 기록하지 않은 것은 다르다. */}
+          <View style={cardHalfStyle}>
+            <Text style={styles.cardLabel}>오늘 수면</Text>
+            {todaySleeps.length === 0 ? (
+              <Text style={styles.cardEmpty}>기록 없음</Text>
+            ) : (
+              <Text style={styles.cardValue}>{formatDuration(sleepMs)}</Text>
+            )}
+          </View>
+          {/* 오늘 수유량을 한 번도 입력하지 않았다면 0ml이 아니라 "기록 없음"이다. */}
+          <View style={cardHalfStyle}>
+            <Text style={styles.cardLabel}>입력된 수유량</Text>
+            {summary.amountMl === null ? (
+              <Text style={styles.cardEmpty}>기록 없음</Text>
+            ) : (
+              <Text style={styles.cardValue}>{summary.amountMl}ml</Text>
+            )}
+          </View>
         </View>
       </ScrollView>
 
