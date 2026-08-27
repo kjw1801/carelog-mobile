@@ -85,7 +85,11 @@ export default function SleepFormScreen() {
     }
 
     const note = noteText.trim();
-    await updateSleep(db, sleepId, startedAt, endedAt, note === '' ? null : note);
+    await updateSleep(db, sleepId, {
+      startedAt,
+      endedAt,
+      note: note === '' ? null : note,
+    });
     router.back();
   }
 

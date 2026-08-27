@@ -8,6 +8,13 @@ export type Sleep = {
   note: string | null;
 };
 
+export type SleepInput = {
+  startedAt: number;
+  /** null이면 진행 중. */
+  endedAt: number | null;
+  note: string | null;
+};
+
 const COLUMNS = 'id, started_at, ended_at, note';
 
 export function getSleep(db: SQLiteDatabase, id: number): Promise<Sleep | null> {
@@ -55,17 +62,15 @@ export async function endSleep(
 export async function updateSleep(
   db: SQLiteDatabase,
   id: number,
-  startedAt: number,
-  endedAt: number | null,
-  note: string | null
+  input: SleepInput
 ): Promise<void> {
   await db.runAsync(
     `UPDATE sleeps
         SET started_at = ?, ended_at = ?, note = ?, updated_at = ?
       WHERE id = ?`,
-    startedAt,
-    endedAt,
-    note,
+    input.startedAt,
+    input.endedAt,
+    input.note,
     Date.now(),
     id
   );
