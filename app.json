@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "95c25fb9-30ce-4f83-ac12-10f07e0a3658"
+      }
+    },
+    "owner": "martin.kim"
   }
 }
