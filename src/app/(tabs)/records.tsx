@@ -5,7 +5,7 @@ import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { DIAPER_KIND_LABEL } from '@/db/diapers';
 import { listTimeline, type TimelineEntry } from '@/db/timeline';
-import { formatDay, formatTimeOfDay, isSameDay } from '@/lib/time';
+import { formatDay, formatDuration, formatTimeOfDay, isSameDay } from '@/lib/time';
 
 type Section = { title: string; data: TimelineEntry[] };
 
@@ -27,8 +27,32 @@ function describe(entry: TimelineEntry): string {
   if (entry.type === 'feeding') {
     return entry.amount_ml === null ? '양 기록 없음' : `${entry.amount_ml}ml`;
   }
-  return entry.diaper_kind === null ? '' : DIAPER_KIND_LABEL[entry.diaper_kind];
+  if (entry.type === 'diaper') {
+    return entry.diaper_kind === null ? '' : DIAPER_KIND_LABEL[entry.diaper_kind];
+  }
+  // 수면은 구간이다. 진행 중이면 아직 길이가 없다.
+  if (entry.sleep_ended_at === null) return '진행 중';
+  const duration = formatDuration(entry.sleep_ended_at - entry.occurred_at);
+  const endTime = formatTimeOfDay(entry.sleep_ended_at);
+  // 자정을 넘긴 수면은 종료 시각만 쓰면 같은 날인지 알 수 없다.
+  const end = isSameDay(entry.occurred_at, entry.sleep_ended_at)
+    ? `~${endTime}`
+    : `~${formatDay(entry.sleep_ended_at)} ${endTime}`;
+  return `${duration} · ${end}`;
 }
+
+const TYPE_LABEL: Record<TimelineEntry['type'], string> = {
+  feeding: '수유',
+  diaper: '기저귀',
+  sleep: '수면',
+};
+
+// typedRoutes가 켜져 있어 Href는 리터럴 유니온이다. string으로 넓히면 거부된다.
+const FORM_PATH = {
+  feeding: '/feeding-form',
+  diaper: '/diaper-form',
+  sleep: '/sleep-form',
+} as const;
 
 export default function RecordsScreen() {
   const db = useSQLiteContext();
@@ -65,33 +89,26 @@ export default function RecordsScreen() {
       renderSectionHeader={({ section }) => (
         <Text style={styles.sectionHeader}>{section.title}</Text>
       )}
-      renderItem={({ item }) => {
-        const isFeeding = item.type === 'feeding';
-        return (
-          <Link
-            href={{
-              pathname: isFeeding ? '/feeding-form' : '/diaper-form',
-              params: { id: item.id },
-            }}
-            asChild>
-            <Pressable style={styles.row} accessibilityRole="button">
-              <Text style={styles.rowTime}>{formatTimeOfDay(item.occurred_at)}</Text>
-              <View
-                style={[styles.tag, isFeeding ? styles.tagFeeding : styles.tagDiaper]}>
-                <Text style={styles.tagText}>{isFeeding ? '수유' : '기저귀'}</Text>
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={styles.rowDetail}>{describe(item)}</Text>
-                {item.note ? (
-                  <Text style={styles.rowNote} numberOfLines={1}>
-                    {item.note}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          </Link>
-        );
-      }}
+      renderItem={({ item }) => (
+        <Link
+          href={{ pathname: FORM_PATH[item.type], params: { id: item.id } }}
+          asChild>
+          <Pressable style={styles.row} accessibilityRole="button">
+            <Text style={styles.rowTime}>{formatTimeOfDay(item.occurred_at)}</Text>
+            <View style={TAG_STYLE[item.type]}>
+              <Text style={styles.tagText}>{TYPE_LABEL[item.type]}</Text>
+            </View>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowDetail}>{describe(item)}</Text>
+              {item.note ? (
+                <Text style={styles.rowNote} numberOfLines={1}>
+                  {item.note}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        </Link>
+      )}
     />
   );
 }
@@ -122,8 +139,15 @@ const styles = StyleSheet.create({
   tag: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 },
   tagFeeding: { backgroundColor: '#e5f0ff' },
   tagDiaper: { backgroundColor: '#e6f4ea' },
+  tagSleep: { backgroundColor: '#e8e7f0' },
   tagText: { fontSize: 12, fontWeight: '600', color: '#3a3a3c' },
   rowBody: { flex: 1, gap: 2 },
   rowDetail: { fontSize: 16, color: '#1c1c1e' },
   rowNote: { fontSize: 14, color: '#8a8a8e' },
 });
+
+const TAG_STYLE: Record<TimelineEntry['type'], object> = {
+  feeding: StyleSheet.flatten([styles.tag, styles.tagFeeding]),
+  diaper: StyleSheet.flatten([styles.tag, styles.tagDiaper]),
+  sleep: StyleSheet.flatten([styles.tag, styles.tagSleep]),
+};

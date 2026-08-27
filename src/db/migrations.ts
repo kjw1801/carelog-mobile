@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -44,6 +44,33 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_diapers_occurred_at ON diapers(occurred_at);
       `);
       current = 2;
+    }
+
+    if (current < 3) {
+      // ended_at IS NULL이 "진행 중"이다. 수유량 NULL과 같은 결로,
+      // "아직 안 끝남"과 "0분 잤음"은 다른 사실이다.
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS sleeps (
+          id          INTEGER PRIMARY KEY NOT NULL,
+          started_at  INTEGER NOT NULL,
+          ended_at    INTEGER,
+          note        TEXT,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL,
+          CHECK (ended_at IS NULL OR ended_at > started_at)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sleeps_started_at ON sleeps(started_at);
+      `);
+      // 진행 중인 수면은 하나만 허용한다.
+      //
+      // ON sleeps(ended_at) WHERE ended_at IS NULL 로 쓰면 안 된다. SQLite는
+      // UNIQUE 인덱스에서 NULL끼리 충돌시키지 않으므로 아무것도 막지 못한다.
+      // 활성 행 전부에 같은 상수를 넣어야 두 번째부터 충돌한다.
+      await txn.execAsync(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_sleeps_one_active
+          ON sleeps((1)) WHERE ended_at IS NULL;
+      `);
+      current = 3;
     }
 
     // PRAGMA는 바인딩 파라미터를 받지 않는다. 값은 이 파일의 상수다.
