@@ -211,18 +211,12 @@ Records 시간순 목록 / 수정·삭제 / 앱 재시작 후에도 유지.
 `YYYY-MM-DD` `TEXT`로 저장한다. 기존 `todayRange`·`formatDay`는 전부 epoch
 기준이므로 이 값에 그대로 쓰면 안 된다.
 
-```sql
-CREATE TABLE baby (
-  id         INTEGER PRIMARY KEY CHECK (id = 1),
-  name       TEXT,
-  birth_date TEXT,
-  updated_at INTEGER NOT NULL
-);
-```
+키-값 테이블이 아니라 **단일 행 테이블**에 이름과 생년월일을 각각의 컬럼으로
+둔다. 타입과 의미가 스키마에 그대로 드러나기 때문이다. 여러 아이 확장과는
+무관하다 — 그건 세 기록 테이블 전부에 `baby_id`가 붙어야 하는 별개의 작업이다.
 
-키-값 테이블이 아니라 단일 행 테이블을 쓰는 이유는 **이름과 생년월일의 타입과
-의미가 코드에 그대로 드러나기 때문이다.** 여러 아이 확장과는 무관하다 — 그건
-세 기록 테이블 전부에 `baby_id`가 붙어야 하는 별개의 작업이다.
+정확한 DDL은 `src/db/migrations.ts`에만 둔다. 이 문서에 옮겨 적으면 갈라진다
+(실제로 한 번 `updated_at`이 빠진 채 갈라졌다).
 
 완료 기준: 이름·생년월일을 저장하고 앱을 재시작해도 남는다.
 Today 상단에 아이 이름이 보인다.

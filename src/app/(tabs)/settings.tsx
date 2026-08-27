@@ -66,6 +66,8 @@ export default function SettingsScreen() {
         name: trimmed === '' ? null : trimmed,
         birth_date: birthDate,
       });
+      // 저장한 값으로 입력창을 맞춘다. 앞뒤 공백을 넣었다면 화면과 DB가 어긋난다.
+      setName(trimmed);
       Alert.alert('저장했습니다');
     } catch {
       Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
