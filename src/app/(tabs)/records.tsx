@@ -3,13 +3,14 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 
-import { listFeedings, type Feeding } from '@/db/feedings';
+import { DIAPER_KIND_LABEL } from '@/db/diapers';
+import { listTimeline, type TimelineEntry } from '@/db/timeline';
 import { formatDay, formatTimeOfDay, isSameDay } from '@/lib/time';
 
-type Section = { title: string; data: Feeding[] };
+type Section = { title: string; data: TimelineEntry[] };
 
 /** 시간 역순으로 정렬된 목록을 현지 날짜별로 묶는다. */
-function groupByDay(rows: Feeding[]): Section[] {
+function groupByDay(rows: TimelineEntry[]): Section[] {
   const sections: Section[] = [];
   for (const row of rows) {
     const current = sections[sections.length - 1];
@@ -22,14 +23,21 @@ function groupByDay(rows: Feeding[]): Section[] {
   return sections;
 }
 
+function describe(entry: TimelineEntry): string {
+  if (entry.type === 'feeding') {
+    return entry.amount_ml === null ? '양 기록 없음' : `${entry.amount_ml}ml`;
+  }
+  return entry.diaper_kind === null ? '' : DIAPER_KIND_LABEL[entry.diaper_kind];
+}
+
 export default function RecordsScreen() {
   const db = useSQLiteContext();
-  const [rows, setRows] = useState<Feeding[]>([]);
+  const [rows, setRows] = useState<TimelineEntry[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      listFeedings(db).then((result) => {
+      listTimeline(db).then((result) => {
         if (alive) setRows(result);
       });
       return () => {
@@ -52,28 +60,38 @@ export default function RecordsScreen() {
     <SectionList
       style={styles.list}
       sections={sections}
-      keyExtractor={(item) => String(item.id)}
+      keyExtractor={(item) => `${item.type}-${item.id}`}
       contentContainerStyle={styles.listContent}
       renderSectionHeader={({ section }) => (
         <Text style={styles.sectionHeader}>{section.title}</Text>
       )}
-      renderItem={({ item }) => (
-        <Link href={{ pathname: '/feeding-form', params: { id: item.id } }} asChild>
-          <Pressable style={styles.row} accessibilityRole="button">
-            <Text style={styles.rowTime}>{formatTimeOfDay(item.occurred_at)}</Text>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowAmount}>
-                {item.amount_ml === null ? '양 기록 없음' : `${item.amount_ml}ml`}
-              </Text>
-              {item.note ? (
-                <Text style={styles.rowNote} numberOfLines={1}>
-                  {item.note}
-                </Text>
-              ) : null}
-            </View>
-          </Pressable>
-        </Link>
-      )}
+      renderItem={({ item }) => {
+        const isFeeding = item.type === 'feeding';
+        return (
+          <Link
+            href={{
+              pathname: isFeeding ? '/feeding-form' : '/diaper-form',
+              params: { id: item.id },
+            }}
+            asChild>
+            <Pressable style={styles.row} accessibilityRole="button">
+              <Text style={styles.rowTime}>{formatTimeOfDay(item.occurred_at)}</Text>
+              <View
+                style={[styles.tag, isFeeding ? styles.tagFeeding : styles.tagDiaper]}>
+                <Text style={styles.tagText}>{isFeeding ? '수유' : '기저귀'}</Text>
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowDetail}>{describe(item)}</Text>
+                {item.note ? (
+                  <Text style={styles.rowNote} numberOfLines={1}>
+                    {item.note}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          </Link>
+        );
+      }}
     />
   );
 }
@@ -93,7 +111,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
     backgroundColor: '#fff',
     borderRadius: 12,
     paddingVertical: 18,
@@ -101,7 +119,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   rowTime: { fontSize: 17, fontWeight: '600', color: '#1c1c1e', minWidth: 56 },
+  tag: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 },
+  tagFeeding: { backgroundColor: '#e5f0ff' },
+  tagDiaper: { backgroundColor: '#e6f4ea' },
+  tagText: { fontSize: 12, fontWeight: '600', color: '#3a3a3c' },
   rowBody: { flex: 1, gap: 2 },
-  rowAmount: { fontSize: 16, color: '#1c1c1e' },
+  rowDetail: { fontSize: 16, color: '#1c1c1e' },
   rowNote: { fontSize: 14, color: '#8a8a8e' },
 });

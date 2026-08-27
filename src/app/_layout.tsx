@@ -9,6 +9,7 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="feeding-form" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="diaper-form" options={{ presentation: 'modal' }} />
       </Stack>
     </SQLiteProvider>
   );
