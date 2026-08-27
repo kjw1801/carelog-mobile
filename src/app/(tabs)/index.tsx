@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getBaby, type Baby } from '@/db/baby';
 import { getTodayDiaperCount } from '@/db/diapers';
 import {
   getLastFeeding,
@@ -37,6 +38,7 @@ export default function TodayScreen() {
   const [summary, setSummary] = useState<TodaySummary>({ count: 0, amountMl: null });
   const [diaperCount, setDiaperCount] = useState(0);
   const [todaySleeps, setTodaySleeps] = useState<Sleep[]>([]);
+  const [baby, setBaby] = useState<Baby | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [toggling, setToggling] = useState(false);
   // setState는 다음 렌더에야 반영되므로 연타를 막지 못한다. 실제 잠금은 ref로 걸고,
@@ -71,13 +73,14 @@ export default function TodayScreen() {
   // alive 검사가 이미 늦어 아무것도 막지 못한다.
   const fetchAll = useCallback(async () => {
     const { start, end } = todayRange(new Date(dayStart));
-    const [lastRow, todayRow, diapers, sleeps] = await Promise.all([
+    const [lastRow, todayRow, diapers, sleeps, babyRow] = await Promise.all([
       getLastFeeding(db),
       getTodaySummary(db, start, end),
       getTodayDiaperCount(db, start, end),
       listSleepsOverlapping(db, start, end),
+      getBaby(db),
     ]);
-    return { lastRow, todayRow, diapers, sleeps };
+    return { lastRow, todayRow, diapers, sleeps, babyRow };
   }, [db, dayStart]);
 
   const apply = useCallback((data: Awaited<ReturnType<typeof fetchAll>>) => {
@@ -85,6 +88,7 @@ export default function TodayScreen() {
     setSummary(data.todayRow);
     setDiaperCount(data.diapers);
     setTodaySleeps(data.sleeps);
+    setBaby(data.babyRow);
   }, []);
 
   // 저장·수정·삭제 후 모달이 닫히면 이 화면이 포커스를 받는다. 그때 다시 조회한다.
@@ -174,6 +178,8 @@ export default function TodayScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.cards} contentContainerStyle={styles.cardsContent}>
+        {baby?.name ? <Text style={styles.greeting}>{baby.name}의 오늘</Text> : null}
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
@@ -268,6 +274,7 @@ const styles = StyleSheet.create({
   // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
   cards: { flex: 1 },
   cardsContent: { gap: 12, paddingBottom: 4 },
+  greeting: { fontSize: 20, fontWeight: '700', color: '#1c1c1e', marginBottom: 4 },
   cardRow: { flexDirection: 'row', gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, gap: 4 },
   cardHalf: { flex: 1 },

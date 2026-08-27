@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -71,6 +71,24 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
           ON sleeps((1)) WHERE ended_at IS NULL;
       `);
       current = 3;
+    }
+
+    if (current < 4) {
+      // 아이는 V1에서 하나뿐이다. 키-값 테이블 대신 단일 행 테이블을 쓰면
+      // 이름과 생년월일의 타입과 의미가 스키마에 그대로 드러난다.
+      // CHECK로 행이 하나만 존재하도록 DB가 강제한다.
+      //
+      // birth_date는 epoch가 아니라 YYYY-MM-DD TEXT다. 특정 순간이 아니라
+      // 달력 날짜라, epoch로 두면 시간대가 바뀔 때 날짜가 밀린다.
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS baby (
+          id         INTEGER PRIMARY KEY CHECK (id = 1),
+          name       TEXT,
+          birth_date TEXT,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+      current = 4;
     }
 
     // PRAGMA는 바인딩 파라미터를 받지 않는다. 값은 이 파일의 상수다.
