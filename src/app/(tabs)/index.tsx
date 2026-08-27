@@ -1,21 +1,110 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Link, useFocusEffect } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useCallback, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+  getLastFeeding,
+  getTodaySummary,
+  type Feeding,
+  type TodaySummary,
+} from '@/db/feedings';
+import { formatElapsed, formatTimeOfDay, todayRange } from '@/lib/time';
 
 export default function TodayScreen() {
+  const db = useSQLiteContext();
+  const [last, setLast] = useState<Feeding | null>(null);
+  const [summary, setSummary] = useState<TodaySummary>({ count: 0, amountMl: null });
+  const [now, setNow] = useState(() => Date.now());
+
+  // 저장·수정·삭제 후 모달이 닫히면 이 화면이 포커스를 받는다. 그때 다시 조회한다.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      const { start, end } = todayRange();
+      Promise.all([getLastFeeding(db), getTodaySummary(db, start, end)]).then(
+        ([lastRow, todayRow]) => {
+          if (!alive) return;
+          setLast(lastRow);
+          setSummary(todayRow);
+        }
+      );
+      return () => {
+        alive = false;
+      };
+    }, [db])
+  );
+
+  // 경과 시간은 1분마다, 그리고 앱이 foreground로 돌아올 때 갱신한다.
+  // 갱신할 때 DB를 다시 읽지는 않는다 — 마지막 수유 시각은 그대로고 현재 시각만 변한다.
+  useFocusEffect(
+    useCallback(() => {
+      setNow(Date.now());
+      const timer = setInterval(() => setNow(Date.now()), 60_000);
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') setNow(Date.now());
+      });
+      return () => {
+        clearInterval(timer);
+        subscription.remove();
+      };
+    }, [])
+  );
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.placeholder}>아직 기록이 없습니다</Text>
-    </View>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.cards}>
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>마지막 수유</Text>
+          {last ? (
+            <>
+              <Text style={styles.cardValue}>{formatElapsed(last.occurred_at, now)}</Text>
+              <Text style={styles.cardSub}>{formatTimeOfDay(last.occurred_at)}</Text>
+            </>
+          ) : (
+            <Text style={styles.cardEmpty}>기록 없음</Text>
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>오늘 수유</Text>
+          <Text style={styles.cardValue}>{summary.count}회</Text>
+        </View>
+
+        {/* 오늘 수유량을 한 번도 입력하지 않았다면 0ml이 아니라 "기록 없음"이다. */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>입력된 수유량</Text>
+          {summary.amountMl === null ? (
+            <Text style={styles.cardEmpty}>기록 없음</Text>
+          ) : (
+            <Text style={styles.cardValue}>{summary.amountMl}ml</Text>
+          )}
+        </View>
+      </View>
+
+      <Link href="/feeding-form" asChild>
+        <Pressable style={styles.addButton} accessibilityRole="button">
+          <Text style={styles.addButtonText}>수유 기록</Text>
+        </Pressable>
+      </Link>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1, backgroundColor: '#f2f2f7', padding: 20, gap: 16 },
+  cards: { flex: 1, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, gap: 4 },
+  cardLabel: { fontSize: 14, color: '#8a8a8e' },
+  cardValue: { fontSize: 32, fontWeight: '700', color: '#1c1c1e' },
+  cardSub: { fontSize: 15, color: '#8a8a8e' },
+  cardEmpty: { fontSize: 20, color: '#b0b0b5', paddingVertical: 6 },
+  addButton: {
+    backgroundColor: '#0a84ff',
+    borderRadius: 14,
+    paddingVertical: 20,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  placeholder: {
-    fontSize: 16,
-    color: '#8a8a8e',
-  },
+  addButtonText: { fontSize: 18, fontWeight: '700', color: '#fff' },
 });
