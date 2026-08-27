@@ -43,7 +43,7 @@ export default function RecordsScreen() {
   if (rows.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>아직 기록이 없습니다</Text>
+        <Text style={styles.emptyText}>아직 기록이 없습니다람쥐</Text>
       </View>
     );
   }

@@ -1,5 +1,5 @@
 import DateTimePicker, {
-  type DateTimePickerEvent,
+  type DateTimePickerChangeEvent,
 } from '@react-native-community/datetimepicker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -55,10 +55,9 @@ export default function FeedingFormScreen() {
     };
   }, [db, feedingId]);
 
-  function onPickerChange(event: DateTimePickerEvent, selected?: Date) {
+  function onPickerChange(_event: DateTimePickerChangeEvent, selected: Date) {
     const mode = picker;
     setPicker(null);
-    if (event.type !== 'set' || !selected) return;
 
     const base = new Date(occurredAt);
     const next =
@@ -182,7 +181,8 @@ export default function FeedingFormScreen() {
           mode={picker}
           is24Hour
           maximumDate={picker === 'date' ? new Date() : undefined}
-          onChange={onPickerChange}
+          onValueChange={onPickerChange}
+          onDismiss={() => setPicker(null)}
         />
       ) : null}
     </ScrollView>

@@ -18,11 +18,17 @@ export default function TodayScreen() {
   const [summary, setSummary] = useState<TodaySummary>({ count: 0, amountMl: null });
   const [now, setNow] = useState(() => Date.now());
 
+  // 오늘의 시작을 now에서 파생시킨다. 하루 안에서는 같은 숫자라 아래 조회가
+  // 매분 다시 돌지 않고, 자정을 넘기면 값이 바뀌어 다시 조회된다.
+  const dayStart = todayRange(new Date(now)).start;
+
   // 저장·수정·삭제 후 모달이 닫히면 이 화면이 포커스를 받는다. 그때 다시 조회한다.
+  // dayStart가 바뀔 때도 다시 조회한다 — 화면을 켜둔 채, 또는 앱을 백그라운드에
+  // 둔 채 자정을 넘기면 포커스가 바뀌지 않아 어제 집계가 그대로 남는다.
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      const { start, end } = todayRange();
+      const { start, end } = todayRange(new Date(dayStart));
       Promise.all([getLastFeeding(db), getTodaySummary(db, start, end)]).then(
         ([lastRow, todayRow]) => {
           if (!alive) return;
@@ -33,11 +39,12 @@ export default function TodayScreen() {
       return () => {
         alive = false;
       };
-    }, [db])
+    }, [db, dayStart])
   );
 
   // 경과 시간은 1분마다, 그리고 앱이 foreground로 돌아올 때 갱신한다.
   // 갱신할 때 DB를 다시 읽지는 않는다 — 마지막 수유 시각은 그대로고 현재 시각만 변한다.
+  // 단 이 갱신으로 날짜가 넘어가면 위 dayStart가 바뀌면서 집계는 다시 조회된다.
   useFocusEffect(
     useCallback(() => {
       setNow(Date.now());
