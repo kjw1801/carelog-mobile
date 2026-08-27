@@ -22,7 +22,7 @@ import {
   updateDiaper,
   type DiaperKind,
 } from '@/db/diapers';
-import { formatDay, formatTimeOfDay } from '@/lib/time';
+import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
 
 const KINDS: DiaperKind[] = ['pee', 'poo', 'both'];
 
@@ -62,24 +62,7 @@ export default function DiaperFormScreen() {
     const mode = picker;
     setPicker(null);
 
-    const base = new Date(occurredAt);
-    const next =
-      mode === 'date'
-        ? new Date(
-            selected.getFullYear(),
-            selected.getMonth(),
-            selected.getDate(),
-            base.getHours(),
-            base.getMinutes()
-          )
-        : new Date(
-            base.getFullYear(),
-            base.getMonth(),
-            base.getDate(),
-            selected.getHours(),
-            selected.getMinutes()
-          );
-    setOccurredAt(next.getTime());
+    if (mode) setOccurredAt(mergePickedDateTime(occurredAt, selected, mode));
   }
 
   async function onSave() {

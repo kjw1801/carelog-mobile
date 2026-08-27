@@ -21,7 +21,7 @@ import {
   updateFeeding,
 } from '@/db/feedings';
 import { parseAmount } from '@/lib/amount';
-import { formatDay, formatTimeOfDay } from '@/lib/time';
+import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
 
 export default function FeedingFormScreen() {
   const db = useSQLiteContext();
@@ -59,24 +59,7 @@ export default function FeedingFormScreen() {
     const mode = picker;
     setPicker(null);
 
-    const base = new Date(occurredAt);
-    const next =
-      mode === 'date'
-        ? new Date(
-            selected.getFullYear(),
-            selected.getMonth(),
-            selected.getDate(),
-            base.getHours(),
-            base.getMinutes()
-          )
-        : new Date(
-            base.getFullYear(),
-            base.getMonth(),
-            base.getDate(),
-            selected.getHours(),
-            selected.getMinutes()
-          );
-    setOccurredAt(next.getTime());
+    if (mode) setOccurredAt(mergePickedDateTime(occurredAt, selected, mode));
   }
 
   async function onSave() {
