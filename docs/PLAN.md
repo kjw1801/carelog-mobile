@@ -482,6 +482,10 @@ Play 제목                  안녕아가 - 수유·기저귀·수면 기록    
 시뮬레이터 빌드는 Apple Developer Program 가입 없이 만들 수 있다.
 실기기 서명과 App Store 배포에는 계정이 필요하다.
 
+**앱 아이콘은 제출 전에 알파 채널을 뺀 RGB PNG로 바꾼다.** 지금
+`annyeongaga-icon.png`는 투명 픽셀은 없지만 알파 채널 자체는 있다.
+Android 빌드는 막지 않으므로 이 단계에서 처리한다.
+
 TestFlight / App Store 심사.
 
 ## 범위
