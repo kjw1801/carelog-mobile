@@ -58,6 +58,24 @@ export function formatDuration(ms: number): string {
 }
 
 /**
+ * 하루 합계처럼 좁은 자리에 들어가야 하는 길이를 줄여 쓴다.
+ *
+ * 1시간이 넘으면 분을 버린다. `16시간 20분`은 Today의 반 폭 카드에 한 줄로
+ * 들어가지 않아 두 줄로 접히고, 그만큼 카드가 높아져 스크롤 영역을 넘긴다.
+ * 하루 합계에서 분 단위는 의미가 작고, 개별 수면의 분은 기록 탭에 그대로 남는다.
+ *
+ * 버린 분이 있으면 `+`를 붙인다. `16시간 59분`도 `16시간`이 되므로 그냥 두면
+ * 정확한 값처럼 읽힌다. `약 16시간`은 반올림처럼 보여 오히려 위로 오해하게
+ * 만든다 — 이 함수는 반올림하지 않는다.
+ */
+export function formatDurationCompact(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  if (minutes < 60) return formatDuration(ms);
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 === 0 ? `${hours}시간` : `${hours}시간+`;
+}
+
+/**
  * 선택기에서 고른 날짜 또는 시각을 기존 시각에 부분 적용한다.
  *
  * date 모드는 연·월·일만, time 모드는 시·분만 가져오고 나머지는 base를 유지한다.

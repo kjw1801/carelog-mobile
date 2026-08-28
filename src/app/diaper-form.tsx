@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -113,6 +114,7 @@ export default function DiaperFormScreen() {
   if (!ready) return <View style={styles.container} />;
 
   return (
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -205,12 +207,15 @@ export default function DiaperFormScreen() {
         />
       ) : null}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 20, paddingBottom: 48, gap: 8 },
+  // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
+  // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
+  content: { padding: 20, paddingBottom: 120, gap: 8 },
   label: { fontSize: 14, fontWeight: '600', color: '#3a3a3c', marginTop: 16 },
   row: { flexDirection: 'row', gap: 8 },
   chip: {

@@ -8,7 +8,6 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,9 +84,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
@@ -152,7 +149,10 @@ export default function SettingsScreen() {
         <View style={styles.about}>
           <Text style={styles.aboutTitle}>carelog</Text>
           <Text style={styles.aboutLine}>버전 {Constants.expoConfig?.version ?? '-'}</Text>
-          <Text style={styles.aboutLine}>기록은 이 기기에만 저장됩니다.</Text>
+          {/* `기기에만 저장됩니다`라고 쓰지 않는다. android.allowBackup을
+              지정하지 않아 기본값 true이고, 자동 백업으로 사용자 클라우드에
+              올라갈 수 있다. 6단계에서 막을지 정한다. */}
+          <Text style={styles.aboutLine}>로그인 없이 사용할 수 있습니다.</Text>
         </View>
 
         {showPicker ? (
@@ -171,7 +171,9 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7' },
-  content: { padding: 20, paddingBottom: 48, gap: 8 },
+  // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
+  // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
+  content: { padding: 20, paddingBottom: 120, gap: 8 },
   label: { fontSize: 14, fontWeight: '600', color: '#3a3a3c', marginTop: 16 },
   input: {
     borderWidth: 1,

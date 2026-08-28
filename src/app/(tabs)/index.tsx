@@ -29,7 +29,13 @@ import {
   type Sleep,
 } from '@/db/sleeps';
 import { calculateSleepDuration } from '@/lib/sleep';
-import { formatDuration, formatElapsed, formatTimeOfDay, todayRange } from '@/lib/time';
+import {
+  formatDuration,
+  formatDurationCompact,
+  formatElapsed,
+  formatTimeOfDay,
+  todayRange,
+} from '@/lib/time';
 
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
@@ -176,6 +182,36 @@ export default function TodayScreen() {
     }
   }
 
+  // 패널은 버튼보다 터치 영역이 훨씬 넓어 오터치 위험이 크다. 종료만 한 번 묻는다.
+  // 시작은 잘못 눌러도 바로 다시 눌러 되돌릴 수 있으므로 묻지 않는다.
+  function onPressSleep() {
+    if (togglingRef.current) return;
+    if (!activeSleep) {
+      void onToggleSleep();
+      return;
+    }
+    Alert.alert('수면을 종료할까요?', undefined, [
+      { text: '취소', style: 'cancel' },
+      { text: '종료', onPress: () => void onToggleSleep() },
+    ]);
+  }
+
+  const elapsedSleep = activeSleep ? formatDuration(now - activeSleep.started_at) : null;
+  const sleepOverdue = activeSleep ? now - activeSleep.started_at >= TWELVE_HOURS : false;
+
+  // 라벨을 붙이면 자식 Text가 낭독에서 빠진다. 화면에 보이는 값을 전부 넣는다.
+  const sleepAccessibilityLabel = activeSleep
+    ? [
+        '수면 중',
+        elapsedSleep,
+        `${formatTimeOfDay(activeSleep.started_at)} 시작`,
+        sleepOverdue ? '12시간 초과' : null,
+        '탭하여 종료 확인',
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : '수면 시작';
+
   // 탭 라벨은 `오늘`로 두고 헤더 제목만 바꾼다. `title`은 둘 다 바꾼다.
   // setOptions가 매 렌더 새 객체를 받으면 불필요한 재설정이 생긴다.
   const babyName = baby?.name;
@@ -193,7 +229,7 @@ export default function TodayScreen() {
           <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
             <>
-              <Text style={styles.cardValue}>{formatElapsed(last.occurred_at, now)}</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>{formatElapsed(last.occurred_at, now)}</Text>
               <Text style={styles.cardSub}>{formatTimeOfDay(last.occurred_at)}</Text>
             </>
           ) : (
@@ -201,31 +237,14 @@ export default function TodayScreen() {
           )}
         </View>
 
-        {activeSleep ? (
-          <View style={sleepCardStyle}>
-            <Text style={styles.sleepLabel}>수면 중</Text>
-            <Text style={styles.sleepValue}>
-              {formatDuration(now - activeSleep.started_at)}
-            </Text>
-            <Text style={styles.sleepSub}>
-              {formatTimeOfDay(activeSleep.started_at)} 시작
-            </Text>
-            {/* 가장 흔한 실수는 종료를 안 누르는 것이다. 막거나 자동 종료하지
-                않고 확인만 권한다 — 실제로 긴 수면도 있다. */}
-            {now - activeSleep.started_at >= TWELVE_HOURS ? (
-              <Text style={styles.sleepWarn}>종료를 잊지 않았는지 확인해 주세요</Text>
-            ) : null}
-          </View>
-        ) : null}
-
         <View style={styles.cardRow}>
           <View style={cardHalfStyle}>
             <Text style={styles.cardLabel}>오늘 수유</Text>
-            <Text style={styles.cardValue}>{summary.count}회</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>{summary.count}회</Text>
           </View>
           <View style={cardHalfStyle}>
             <Text style={styles.cardLabel}>오늘 기저귀</Text>
-            <Text style={styles.cardValue}>{diaperCount}회</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>{diaperCount}회</Text>
           </View>
         </View>
 
@@ -237,7 +256,7 @@ export default function TodayScreen() {
             {todaySleeps.length === 0 ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue}>{formatDuration(sleepMs)}</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>{formatDurationCompact(sleepMs)}</Text>
             )}
           </View>
           {/* 오늘 수유량을 한 번도 입력하지 않았다면 0ml이 아니라 "기록 없음"이다. */}
@@ -246,7 +265,7 @@ export default function TodayScreen() {
             {summary.amountMl === null ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue}>{summary.amountMl}ml</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>{summary.amountMl}ml</Text>
             )}
           </View>
         </View>
@@ -266,13 +285,36 @@ export default function TodayScreen() {
       </View>
 
       <Pressable
-        style={activeSleep ? sleepEndButtonStyle : sleepStartButtonStyle}
-        onPress={onToggleSleep}
+        style={activeSleep ? sleepPanelStyle : sleepStartButtonStyle}
+        onPress={onPressSleep}
         disabled={toggling}
-        accessibilityRole="button">
-        <Text style={styles.addButtonText}>
-          {activeSleep ? '수면 종료' : '수면 시작'}
-        </Text>
+        accessibilityRole="button"
+        accessibilityState={{ disabled: toggling }}
+        accessibilityLabel={sleepAccessibilityLabel}>
+        {activeSleep ? (
+          <>
+            <View style={styles.sleepPanelRow}>
+              <Text style={styles.sleepPanelLabel}>수면 중</Text>
+              <Text style={styles.sleepPanelValue}>{elapsedSleep}</Text>
+            </View>
+            <View style={styles.sleepPanelRow}>
+              <Text style={styles.sleepPanelSub}>
+                {formatTimeOfDay(activeSleep.started_at)} 시작
+              </Text>
+              {/* 가장 흔한 실수는 종료를 안 누르는 것이다. 막거나 자동 종료하지
+                  않고 확인만 권한다 — 실제로 긴 수면도 있다.
+                  줄을 늘리지 않고 조작 힌트 자리를 대신 쓴다. 줄이 늘면 스크롤
+                  영역이 줄어 위 카드가 잘린다. */}
+              {sleepOverdue ? (
+                <Text style={styles.sleepPanelWarn}>12시간 초과 · 탭해 종료 확인</Text>
+              ) : (
+                <Text style={styles.sleepPanelSub}>탭해 종료 확인</Text>
+              )}
+            </View>
+          </>
+        ) : (
+          <Text style={styles.addButtonText}>수면 시작</Text>
+        )}
       </Pressable>
     </SafeAreaView>
   );
@@ -282,19 +324,42 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7', padding: 20, gap: 12 },
   // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
   cards: { flex: 1 },
-  cardsContent: { gap: 12, paddingBottom: 4 },
+  // 패널이 3줄로 늘면 카드가 스크롤 영역을 넘긴다. 끝까지 내렸을 때
+  // 마지막 카드가 경계에 붙지 않도록 여백을 준다.
+  cardsContent: { gap: 12, paddingBottom: 12 },
   cardRow: { flexDirection: 'row', gap: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, gap: 4 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 4 },
   cardHalf: { flex: 1 },
   cardLabel: { fontSize: 14, color: '#8a8a8e' },
   cardValue: { fontSize: 32, fontWeight: '700', color: '#1c1c1e' },
   cardSub: { fontSize: 15, color: '#8a8a8e' },
   cardEmpty: { fontSize: 20, color: '#b0b0b5', paddingVertical: 6 },
-  sleepCard: { backgroundColor: '#3f3d56' },
-  sleepLabel: { fontSize: 14, color: '#c7c6d4' },
-  sleepValue: { fontSize: 32, fontWeight: '700', color: '#fff' },
-  sleepSub: { fontSize: 15, color: '#c7c6d4' },
-  sleepWarn: { fontSize: 14, color: '#ffcc66', marginTop: 8 },
+  // 하단 버튼과 패널은 같은 자리에 있고, 기본 글자 크기에서 같은 높이가 된다.
+  // 시작·종료해도 위 카드가 움직이지 않고 스크롤 영역도 줄지 않는다.
+  // 평상시 버튼이 그만큼 커져 누르기도 쉽다.
+  //
+  // height가 아니라 minHeight인 이유는 글자 크기를 키운 기기에서 패널 내용이
+  // 잘리지 않게 하기 위해서다. 그런 기기에서는 패널이 이 값보다 커지므로
+  // 고정 높이가 아니다 — 기본 상태의 최소 높이를 맞추는 것이다.
+  bottomAction: { minHeight: 84, justifyContent: 'center' },
+  // addButton을 재사용하지 않는 이유는 alignItems가 center라 두 줄 배치와 충돌한다.
+  sleepPanel: {
+    backgroundColor: '#3f3d56',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 4,
+  },
+  sleepPanelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 12,
+  },
+  sleepPanelLabel: { fontSize: 15, fontWeight: '700', color: '#c7c6d4' },
+  sleepPanelValue: { fontSize: 22, fontWeight: '700', color: '#fff' },
+  sleepPanelSub: { fontSize: 14, color: '#c7c6d4' },
+  sleepPanelWarn: { fontSize: 14, color: '#ffcc66', flexShrink: 1 },
   buttons: { flexDirection: 'row', gap: 12 },
   // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
   // 전부 먹어 다른 카드를 덮는다.
@@ -307,7 +372,6 @@ const styles = StyleSheet.create({
   inRow: { flex: 1 },
   diaperButton: { backgroundColor: '#34a853' },
   sleepStartButton: { backgroundColor: '#3f3d56' },
-  sleepEndButton: { backgroundColor: '#ff9500' },
   addButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 });
 
@@ -322,7 +386,7 @@ const diaperButtonStyle = StyleSheet.flatten([
 const sleepStartButtonStyle = StyleSheet.flatten([
   styles.addButton,
   styles.sleepStartButton,
+  styles.bottomAction,
 ]);
-const sleepEndButtonStyle = StyleSheet.flatten([styles.addButton, styles.sleepEndButton]);
-const sleepCardStyle = StyleSheet.flatten([styles.card, styles.sleepCard]);
+const sleepPanelStyle = StyleSheet.flatten([styles.sleepPanel, styles.bottomAction]);
 const cardHalfStyle = StyleSheet.flatten([styles.card, styles.cardHalf]);

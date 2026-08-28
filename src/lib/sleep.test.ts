@@ -61,4 +61,65 @@ describe('calculateSleepDuration', () => {
   it('기록이 없으면 0이다', () => {
     expect(sum([])).toBe(0);
   });
+
+  // 진행 중 수면만 하나로 제한되고, 끝난 기록끼리는 시각을 수정해 겹칠 수 있다.
+  // 그대로 더하면 하루에 나올 수 없는 합계가 나온다.
+  describe('겹치는 기록', () => {
+    it('일부만 겹치면 합집합을 센다', () => {
+      // 01:00~03:00 과 02:00~04:00 은 합쳐서 01:00~04:00, 3시간이다.
+      expect(
+        sum([
+          { started_at: DAY_START + 1 * HOUR, ended_at: DAY_START + 3 * HOUR },
+          { started_at: DAY_START + 2 * HOUR, ended_at: DAY_START + 4 * HOUR },
+        ])
+      ).toBe(3 * HOUR);
+    });
+
+    it('한 구간이 다른 구간을 품으면 바깥 것만 센다', () => {
+      expect(
+        sum([
+          { started_at: DAY_START + 1 * HOUR, ended_at: DAY_START + 6 * HOUR },
+          { started_at: DAY_START + 2 * HOUR, ended_at: DAY_START + 3 * HOUR },
+        ])
+      ).toBe(5 * HOUR);
+    });
+
+    it('경계만 맞닿은 구간은 이중으로 세지 않는다', () => {
+      expect(
+        sum([
+          { started_at: DAY_START + 1 * HOUR, ended_at: DAY_START + 2 * HOUR },
+          { started_at: DAY_START + 2 * HOUR, ended_at: DAY_START + 3 * HOUR },
+        ])
+      ).toBe(2 * HOUR);
+    });
+
+    it('진행 중인 수면과 끝난 수면이 겹쳐도 합집합을 센다', () => {
+      // 끝난 09:00~11:00 과 진행 중 10:00~(now 12:00) 은 09:00~12:00, 3시간이다.
+      expect(
+        sum([
+          { started_at: DAY_START + 9 * HOUR, ended_at: DAY_START + 11 * HOUR },
+          { started_at: DAY_START + 10 * HOUR, ended_at: null },
+        ])
+      ).toBe(3 * HOUR);
+    });
+
+    it('입력 순서가 섞여 있어도 같은 값이 나온다', () => {
+      const sleeps: SleepInterval[] = [
+        { started_at: DAY_START + 5 * HOUR, ended_at: DAY_START + 6 * HOUR },
+        { started_at: DAY_START + 1 * HOUR, ended_at: DAY_START + 3 * HOUR },
+        { started_at: DAY_START + 2 * HOUR, ended_at: DAY_START + 4 * HOUR },
+      ];
+      expect(sum(sleeps)).toBe(4 * HOUR);
+      // 인자로 받은 배열을 정렬하며 건드리지 않는다.
+      expect(sleeps[0].started_at).toBe(DAY_START + 5 * HOUR);
+    });
+
+    it('겹치는 기록이 아무리 많아도 하루 길이를 넘지 않는다', () => {
+      const sleeps: SleepInterval[] = Array.from({ length: 10 }, () => ({
+        started_at: DAY_START - 5 * HOUR,
+        ended_at: DAY_END + 5 * HOUR,
+      }));
+      expect(sum(sleeps)).toBe(DAY_END - DAY_START);
+    });
+  });
 });
