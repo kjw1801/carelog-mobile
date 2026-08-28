@@ -23,29 +23,29 @@ function groupByDay(rows: TimelineEntry[]): Section[] {
   return sections;
 }
 
-function describe(entry: TimelineEntry): string {
-  if (entry.type === 'feeding') {
-    return entry.amount_ml === null ? '양 기록 없음' : `${entry.amount_ml}ml`;
-  }
-  if (entry.type === 'diaper') {
-    return entry.diaper_kind === null ? '' : DIAPER_KIND_LABEL[entry.diaper_kind];
-  }
-  // 수면은 구간이다. 진행 중이면 아직 길이가 없다.
-  if (entry.sleep_ended_at === null) return '진행 중';
-  const duration = formatDuration(entry.sleep_ended_at - entry.occurred_at);
-  const endTime = formatTimeOfDay(entry.sleep_ended_at);
-  // 자정을 넘긴 수면은 종료 시각만 쓰면 같은 날인지 알 수 없다.
-  const end = isSameDay(entry.occurred_at, entry.sleep_ended_at)
-    ? `~${endTime}`
-    : `~${formatDay(entry.sleep_ended_at)} ${endTime}`;
-  return `${duration} · ${end}`;
-}
-
-const TYPE_LABEL: Record<TimelineEntry['type'], string> = {
+const TITLE: Record<TimelineEntry['type'], string> = {
   feeding: '수유',
   diaper: '기저귀',
   sleep: '수면',
 };
+
+/**
+ * 종류 옆에 붙는 값. 없으면 그리지 않는다.
+ *
+ * 세 종류가 같은 자리에 각자의 값을 둔다 — 수유는 양, 수면은 잔 시간,
+ * 기저귀는 무엇을 쌌는지. 수유량을 입력하지 않았으면 `양 기록 없음` 같은
+ * 문구도 넣지 않는다. 빈 자리가 있는 편이 훑어볼 때 빠르다.
+ */
+function detail(entry: TimelineEntry): string | null {
+  if (entry.type === 'feeding') {
+    return entry.amount_ml === null ? null : `${entry.amount_ml}ml`;
+  }
+  if (entry.type === 'diaper') {
+    return entry.diaper_kind === null ? null : DIAPER_KIND_LABEL[entry.diaper_kind];
+  }
+  if (entry.sleep_ended_at === null) return '진행 중';
+  return formatDuration(entry.sleep_ended_at - entry.occurred_at);
+}
 
 // typedRoutes가 켜져 있어 Href는 리터럴 유니온이다. string으로 넓히면 거부된다.
 const FORM_PATH = {
@@ -90,38 +90,48 @@ export default function RecordsScreen() {
       renderSectionHeader={({ section }) => (
         <Text style={styles.sectionHeader}>{section.title}</Text>
       )}
-      renderItem={({ item }) => (
-        <Link
-          href={{ pathname: FORM_PATH[item.type], params: { id: item.id } }}
-          asChild>
-          <Pressable style={styles.row} accessibilityRole="button">
-            <Text style={styles.rowTime}>{formatTimeOfDay(item.occurred_at)}</Text>
-            <View style={TAG_STYLE[item.type]}>
-              <Text style={styles.tagText}>{TYPE_LABEL[item.type]}</Text>
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowDetail}>{describe(item)}</Text>
-              {item.note ? (
-                <Text style={styles.rowNote} numberOfLines={1}>
-                  {item.note}
-                </Text>
-              ) : null}
-            </View>
-          </Pressable>
-        </Link>
-      )}
+      renderItem={({ item }) => {
+        const sub = detail(item);
+        return (
+          <Link href={{ pathname: FORM_PATH[item.type], params: { id: item.id } }} asChild>
+            <Pressable style={styles.row} accessibilityRole="button">
+              <Text style={styles.time}>{formatTimeOfDay(item.occurred_at)}</Text>
+              <View style={styles.body}>
+                <View style={styles.titleRow}>
+                  {/* 아이콘 대신 색 점을 쓴다. 기저귀에 어울리는 아이콘이 없어
+                      셋을 맞추려면 하나는 억지가 된다. 종류는 바로 옆에 있다. */}
+                  <View style={DOT_STYLE[item.type]} />
+                  <Text style={styles.title}>{TITLE[item.type]}</Text>
+                  {/* 값은 종류 바로 옆에 붙인다. flex로 밀어 오른쪽 끝에 두면
+                      한 줄인데도 눈이 두 번 움직인다. */}
+                  {sub ? (
+                    <Text style={styles.detail} numberOfLines={1}>
+                      {sub}
+                    </Text>
+                  ) : null}
+                </View>
+                {item.note ? (
+                  <Text style={styles.note} numberOfLines={1}>
+                    {item.note}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          </Link>
+        );
+      }}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#f2f2f7' },
-  listContent: { padding: 16 },
+  list: { flex: 1, backgroundColor: '#fff' },
+  listContent: { paddingHorizontal: 20, paddingBottom: 24 },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#fff',
     gap: 8,
   },
   emptyText: { fontSize: 16, color: '#8a8a8e' },
@@ -130,32 +140,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#8a8a8e',
-    paddingTop: 16,
+    backgroundColor: '#fff',
+    paddingTop: 20,
     paddingBottom: 8,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  rowTime: { fontSize: 17, fontWeight: '600', color: '#1c1c1e', minWidth: 56 },
-  tag: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 },
-  tagFeeding: { backgroundColor: '#e5f0ff' },
-  tagDiaper: { backgroundColor: '#e6f4ea' },
-  tagSleep: { backgroundColor: '#e8e7f0' },
-  tagText: { fontSize: 12, fontWeight: '600', color: '#3a3a3c' },
-  rowBody: { flex: 1, gap: 2 },
-  rowDetail: { fontSize: 16, color: '#1c1c1e' },
-  rowNote: { fontSize: 14, color: '#8a8a8e' },
+  // 카드도 테두리도 없다. 왼쪽 시각 열과 여백만으로 줄이 갈린다.
+  row: { flexDirection: 'row', gap: 16, paddingVertical: 12 },
+  time: { fontSize: 16, fontWeight: '700', color: '#1c1c1e', width: 64 },
+  body: { flex: 1, gap: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotFeeding: { backgroundColor: '#0a84ff' },
+  dotDiaper: { backgroundColor: '#34a853' },
+  dotSleep: { backgroundColor: '#5b597a' },
+  title: { fontSize: 16, fontWeight: '600', color: '#1c1c1e' },
+  detail: { fontSize: 15, color: '#3a3a3c', flexShrink: 1 },
+  note: { fontSize: 14, color: '#8a8a8e' },
 });
 
-const TAG_STYLE: Record<TimelineEntry['type'], object> = {
-  feeding: StyleSheet.flatten([styles.tag, styles.tagFeeding]),
-  diaper: StyleSheet.flatten([styles.tag, styles.tagDiaper]),
-  sleep: StyleSheet.flatten([styles.tag, styles.tagSleep]),
+const DOT_STYLE: Record<TimelineEntry['type'], object> = {
+  feeding: StyleSheet.flatten([styles.dot, styles.dotFeeding]),
+  diaper: StyleSheet.flatten([styles.dot, styles.dotDiaper]),
+  sleep: StyleSheet.flatten([styles.dot, styles.dotSleep]),
 };

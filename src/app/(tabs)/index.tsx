@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, useFocusEffect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -182,7 +183,7 @@ export default function TodayScreen() {
     }
   }
 
-  // 패널은 버튼보다 터치 영역이 훨씬 넓어 오터치 위험이 크다. 종료만 한 번 묻는다.
+  // 진행 중 수면은 실수로 눌러도 즉시 종료되지 않도록 한 번 확인한다.
   // 시작은 잘못 눌러도 바로 다시 눌러 되돌릴 수 있으므로 묻지 않는다.
   function onPressSleep() {
     if (togglingRef.current) return;
@@ -199,12 +200,12 @@ export default function TodayScreen() {
   const elapsedSleep = activeSleep ? formatDuration(now - activeSleep.started_at) : null;
   const sleepOverdue = activeSleep ? now - activeSleep.started_at >= TWELVE_HOURS : false;
 
-  // 라벨을 붙이면 자식 Text가 낭독에서 빠진다. 화면에 보이는 값을 전부 넣는다.
+  // 라벨을 붙이면 자식 Text가 낭독에서 빠진다. 12시간 초과는 화면에서 색으로만
+  // 알리므로 낭독에는 말로 넣는다 — 색은 읽히지 않는다.
   const sleepAccessibilityLabel = activeSleep
     ? [
         '수면 중',
         elapsedSleep,
-        `${formatTimeOfDay(activeSleep.started_at)} 시작`,
         sleepOverdue ? '12시간 초과' : null,
         '탭하여 종료 확인',
       ]
@@ -285,37 +286,24 @@ export default function TodayScreen() {
       </View>
 
       <Pressable
-        style={activeSleep ? sleepPanelStyle : sleepStartButtonStyle}
+        style={activeSleep ? sleepActiveStyle : sleepStartButtonStyle}
         onPress={onPressSleep}
         disabled={toggling}
         accessibilityRole="button"
         accessibilityState={{ disabled: toggling }}
         accessibilityLabel={sleepAccessibilityLabel}>
-        {activeSleep ? (
-          <>
-            <View style={styles.sleepPanelRow}>
-              <Text style={styles.sleepPanelLabel}>수면 중</Text>
-              <Text style={styles.sleepPanelValue}>{elapsedSleep}</Text>
-            </View>
-            <View style={styles.sleepPanelRow}>
-              <Text style={styles.sleepPanelSub}>
-                {formatTimeOfDay(activeSleep.started_at)} 시작
-              </Text>
-              {/* 가장 흔한 실수는 종료를 안 누르는 것이다. 막거나 자동 종료하지
-                  않고 확인만 권한다 — 실제로 긴 수면도 있다.
-                  줄을 늘리지 않고 조작 힌트 자리를 대신 쓴다. 줄이 늘면 스크롤
-                  영역이 줄어 위 카드가 잘린다. */}
-              {sleepOverdue ? (
-                <Text style={styles.sleepPanelWarn}>12시간 초과 · 탭해 종료 확인</Text>
-              ) : (
-                <Text style={styles.sleepPanelSub}>탭해 종료 확인</Text>
-              )}
-            </View>
-          </>
-        ) : (
-          <Text style={styles.addButtonText}>수면 시작</Text>
-        )}
+        <View style={styles.sleepMain}>
+          <Ionicons name="moon" size={18} color="#c7c6d4" />
+          <Text style={sleepOverdue ? sleepOverdueTextStyle : styles.addButtonText}>
+            {activeSleep ? `수면 중 · ${elapsedSleep}` : '수면 시작'}
+          </Text>
+        </View>
+        {/* 시작 시각과 12시간 안내 문구는 넣지 않는다. 여기서 알아야 할 것은
+            자는 중인지, 얼마나 됐는지, 어디를 눌러 끝내는지뿐이다.
+            시작 시각은 기록 탭에 있고, 12시간 초과는 글자 색으로 알린다. */}
+        {activeSleep ? <Text style={styles.sleepEnd}>종료</Text> : null}
       </Pressable>
+
     </SafeAreaView>
   );
 }
@@ -324,8 +312,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7', padding: 20, gap: 12 },
   // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
   cards: { flex: 1 },
-  // 패널이 3줄로 늘면 카드가 스크롤 영역을 넘긴다. 끝까지 내렸을 때
-  // 마지막 카드가 경계에 붙지 않도록 여백을 준다.
+  // 끝까지 내렸을 때 마지막 카드가 경계에 붙지 않도록 여백을 준다.
   cardsContent: { gap: 12, paddingBottom: 12 },
   cardRow: { flexDirection: 'row', gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 4 },
@@ -334,32 +321,6 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 32, fontWeight: '700', color: '#1c1c1e' },
   cardSub: { fontSize: 15, color: '#8a8a8e' },
   cardEmpty: { fontSize: 20, color: '#b0b0b5', paddingVertical: 6 },
-  // 하단 버튼과 패널은 같은 자리에 있고, 기본 글자 크기에서 같은 높이가 된다.
-  // 시작·종료해도 위 카드가 움직이지 않고 스크롤 영역도 줄지 않는다.
-  // 평상시 버튼이 그만큼 커져 누르기도 쉽다.
-  //
-  // height가 아니라 minHeight인 이유는 글자 크기를 키운 기기에서 패널 내용이
-  // 잘리지 않게 하기 위해서다. 그런 기기에서는 패널이 이 값보다 커지므로
-  // 고정 높이가 아니다 — 기본 상태의 최소 높이를 맞추는 것이다.
-  bottomAction: { minHeight: 84, justifyContent: 'center' },
-  // addButton을 재사용하지 않는 이유는 alignItems가 center라 두 줄 배치와 충돌한다.
-  sleepPanel: {
-    backgroundColor: '#3f3d56',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 4,
-  },
-  sleepPanelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: 12,
-  },
-  sleepPanelLabel: { fontSize: 15, fontWeight: '700', color: '#c7c6d4' },
-  sleepPanelValue: { fontSize: 22, fontWeight: '700', color: '#fff' },
-  sleepPanelSub: { fontSize: 14, color: '#c7c6d4' },
-  sleepPanelWarn: { fontSize: 14, color: '#ffcc66', flexShrink: 1 },
   buttons: { flexDirection: 'row', gap: 12 },
   // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
   // 전부 먹어 다른 카드를 덮는다.
@@ -372,6 +333,21 @@ const styles = StyleSheet.create({
   inRow: { flex: 1 },
   diaperButton: { backgroundColor: '#34a853' },
   sleepStartButton: { backgroundColor: '#3f3d56' },
+  // 수면 컨트롤은 위 두 버튼과 같은 addButton을 쓴다. 한 줄에 같은 글자 크기라
+  // 높이가 따로 지정하지 않아도 같아진다. 숫자로 박으면 글자 크기를 키운
+  // 기기에서 어긋난다.
+  // flexDirection이 row가 되면 alignItems는 세로만 맡는다. 가로 가운데는
+  // justifyContent가 한다. 진행 중 상태는 아래 space-between이 덮어쓴다.
+  sleepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  sleepRowActive: { justifyContent: 'space-between', paddingHorizontal: 20 },
+  sleepMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sleepEnd: { fontSize: 15, fontWeight: '700', color: '#c7c6d4' },
+  sleepOverdueText: { color: '#ffcc66' },
   addButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 });
 
@@ -386,7 +362,16 @@ const diaperButtonStyle = StyleSheet.flatten([
 const sleepStartButtonStyle = StyleSheet.flatten([
   styles.addButton,
   styles.sleepStartButton,
-  styles.bottomAction,
+  styles.sleepRow,
 ]);
-const sleepPanelStyle = StyleSheet.flatten([styles.sleepPanel, styles.bottomAction]);
+const sleepActiveStyle = StyleSheet.flatten([
+  styles.addButton,
+  styles.sleepStartButton,
+  styles.sleepRow,
+  styles.sleepRowActive,
+]);
+const sleepOverdueTextStyle = StyleSheet.flatten([
+  styles.addButtonText,
+  styles.sleepOverdueText,
+]);
 const cardHalfStyle = StyleSheet.flatten([styles.card, styles.cardHalf]);
