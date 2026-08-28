@@ -293,7 +293,9 @@ export default function TodayScreen() {
         accessibilityState={{ disabled: toggling }}
         accessibilityLabel={sleepAccessibilityLabel}>
         <View style={styles.sleepMain}>
-          <Ionicons name="moon" size={18} color={activeSleep ? '#fff' : '#c7c6d4'} />
+          {/* 달이 아니라 침대다. 신생아는 낮잠·밤잠을 가리지 않고 자므로
+              달은 사실과 다르다. V1은 수면 구간 하나만 기록한다. */}
+          <Ionicons name="bed" size={18} color={activeSleep ? '#fff' : '#c7c6d4'} />
           <Text style={styles.addButtonText}>
             {activeSleep ? `수면 중 · ${elapsedSleep}` : '수면 시작'}
           </Text>
@@ -301,7 +303,7 @@ export default function TodayScreen() {
         {/* 시작 시각과 12시간 안내 문구는 넣지 않는다. 여기서 알아야 할 것은
             자는 중인지, 얼마나 됐는지, 어디를 눌러 끝내는지뿐이다.
             시작 시각은 기록 탭에 있고, 12시간 초과는 글자 색으로 알린다. */}
-        {activeSleep ? <Text style={styles.sleepEnd}>종료</Text> : null}
+        {activeSleep ? <Text style={styles.sleepEnd}>수면 종료</Text> : null}
       </Pressable>
 
     </SafeAreaView>
@@ -335,11 +337,15 @@ const styles = StyleSheet.create({
   // 버튼 전체 색이 바뀌어야 상태가 바뀐 것으로 읽힌다. 아이콘과 글자만
   // 바꾸면 눌렀는지 아닌지 알기 어렵다.
   //
+  // 밝은 주황(#ff9500)은 밤중에 눈부시고 흰 글자 대비가 2.2:1로 큰 글자
+  // 기준(3:1)에도 못 미쳤다. 차분한 톤으로 낮춰 대비를 얻는다 —
+  // #b85c00은 4.60:1, #9f3a20은 6.77:1이다.
+  //
   // 12시간을 넘기면 한 단계 더 진한 색으로 간다. 주황 위에 노란 글씨를 얹으면
   // 대비가 나빠 안내가 묻힌다.
   sleepStartButton: { backgroundColor: '#3f3d56' },
-  sleepActiveButton: { backgroundColor: '#ff9500' },
-  sleepOverdueButton: { backgroundColor: '#e8590c' },
+  sleepActiveButton: { backgroundColor: '#b85c00' },
+  sleepOverdueButton: { backgroundColor: '#9f3a20' },
   // 수면 컨트롤은 위 두 버튼과 같은 addButton을 쓴다. 한 줄에 같은 글자 크기라
   // 높이가 따로 지정하지 않아도 같아진다. 숫자로 박으면 글자 크기를 키운
   // 기기에서 어긋난다.
