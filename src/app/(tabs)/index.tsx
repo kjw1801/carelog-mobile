@@ -1,4 +1,5 @@
 import { Link, useFocusEffect } from 'expo-router';
+import { Tabs } from 'expo-router/js-tabs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -175,11 +176,19 @@ export default function TodayScreen() {
     }
   }
 
+  // 탭 라벨은 `오늘`로 두고 헤더 제목만 바꾼다. `title`은 둘 다 바꾼다.
+  // setOptions가 매 렌더 새 객체를 받으면 불필요한 재설정이 생긴다.
+  const babyName = baby?.name;
+  const screenOptions = useMemo(
+    () => ({ headerTitle: babyName ? `${babyName}의 오늘` : '오늘' }),
+    [babyName],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView style={styles.cards} contentContainerStyle={styles.cardsContent}>
-        {baby?.name ? <Text style={styles.greeting}>{baby.name}의 오늘</Text> : null}
+      <Tabs.Screen options={screenOptions} />
 
+      <ScrollView style={styles.cards} contentContainerStyle={styles.cardsContent}>
         <View style={styles.card}>
           <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
@@ -274,7 +283,6 @@ const styles = StyleSheet.create({
   // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
   cards: { flex: 1 },
   cardsContent: { gap: 12, paddingBottom: 4 },
-  greeting: { fontSize: 20, fontWeight: '700', color: '#1c1c1e', marginBottom: 4 },
   cardRow: { flexDirection: 'row', gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, gap: 4 },
   cardHalf: { flex: 1 },

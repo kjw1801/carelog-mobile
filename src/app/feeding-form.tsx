@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -34,6 +34,10 @@ export default function FeedingFormScreen() {
   const [noteText, setNoteText] = useState('');
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
   const [ready, setReady] = useState(!isEditing);
+  const [saving, setSaving] = useState(false);
+  // setState는 다음 렌더에야 반영된다. 실제 잠금은 ref로 건다.
+  // insert는 UPSERT가 아니라, 연타하면 기록이 두 개 생긴다.
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (feedingId === null) return;
@@ -63,6 +67,7 @@ export default function FeedingFormScreen() {
   }
 
   async function onSave() {
+    if (savingRef.current) return;
     const amount = parseAmount(amountText);
     if (!amount.ok) {
       Alert.alert('입력을 확인해 주세요', amount.message);
@@ -82,13 +87,22 @@ export default function FeedingFormScreen() {
       note: note === '' ? null : note,
     };
 
-    if (feedingId === null) await insertFeeding(db, input);
-    else await updateFeeding(db, feedingId, input);
-    router.back();
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      if (feedingId === null) await insertFeeding(db, input);
+      else await updateFeeding(db, feedingId, input);
+      router.back();
+    } catch {
+      Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
 
   function onDelete() {
-    if (feedingId === null) return;
+    if (feedingId === null || savingRef.current) return;
     Alert.alert('이 수유 기록을 삭제할까요?', '되돌릴 수 없습니다.', [
       { text: '취소', style: 'cancel' },
       {
@@ -113,13 +127,25 @@ export default function FeedingFormScreen() {
 
       <Text style={styles.label}>수유 시각</Text>
       <View style={styles.row}>
-        <Pressable style={styles.chip} onPress={() => setPicker('date')}>
+        <Pressable
+          style={styles.chip}
+          onPress={() => setPicker('date')}
+          accessibilityRole="button"
+          accessibilityLabel={`날짜 ${formatDay(occurredAt)}, 변경`}>
           <Text style={styles.chipText}>{formatDay(occurredAt)}</Text>
         </Pressable>
-        <Pressable style={styles.chip} onPress={() => setPicker('time')}>
+        <Pressable
+          style={styles.chip}
+          onPress={() => setPicker('time')}
+          accessibilityRole="button"
+          accessibilityLabel={`시각 ${formatTimeOfDay(occurredAt)}, 변경`}>
           <Text style={styles.chipText}>{formatTimeOfDay(occurredAt)}</Text>
         </Pressable>
-        <Pressable style={styles.nowChip} onPress={() => setOccurredAt(Date.now())}>
+        <Pressable
+          style={styles.nowChip}
+          onPress={() => setOccurredAt(Date.now())}
+          accessibilityRole="button"
+          accessibilityLabel="지금 시각으로 설정">
           <Text style={styles.nowChipText}>지금</Text>
         </Pressable>
       </View>
@@ -148,12 +174,22 @@ export default function FeedingFormScreen() {
         accessibilityLabel="메모, 선택 입력"
       />
 
-      <Pressable style={styles.saveButton} onPress={onSave} accessibilityRole="button">
+      <Pressable
+        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        onPress={onSave}
+        disabled={saving}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: saving }}>
         <Text style={styles.saveButtonText}>{isEditing ? '수정' : '저장'}</Text>
       </Pressable>
 
       {isEditing ? (
-        <Pressable style={styles.deleteButton} onPress={onDelete} accessibilityRole="button">
+        <Pressable
+          style={styles.deleteButton}
+          onPress={onDelete}
+          disabled={saving}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: saving }}>
           <Text style={styles.deleteButtonText}>삭제</Text>
         </Pressable>
       ) : null}
@@ -209,6 +245,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a84ff',
     alignItems: 'center',
   },
+  saveButtonDisabled: { backgroundColor: '#b0c9e5' },
   saveButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
   deleteButton: { marginTop: 8, paddingVertical: 18, alignItems: 'center' },
   deleteButtonText: { fontSize: 17, color: '#ff3b30' },

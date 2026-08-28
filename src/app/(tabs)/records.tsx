@@ -76,6 +76,7 @@ export default function RecordsScreen() {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>아직 기록이 없습니다</Text>
+        <Text style={styles.emptyHint}>오늘 화면에서 기록을 추가해 보세요</Text>
       </View>
     );
   }
@@ -116,8 +117,15 @@ export default function RecordsScreen() {
 const styles = StyleSheet.create({
   list: { flex: 1, backgroundColor: '#f2f2f7' },
   listContent: { padding: 16 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f2f2f7',
+    gap: 8,
+  },
   emptyText: { fontSize: 16, color: '#8a8a8e' },
+  emptyHint: { fontSize: 14, color: '#b0b0b5' },
   sectionHeader: {
     fontSize: 13,
     fontWeight: '600',

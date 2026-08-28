@@ -20,6 +20,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: '오늘',
+          // 기본 라벨이 `, 오늘`처럼 앞에 쉼표가 붙어 낭독된다.
+          tabBarAccessibilityLabel: '오늘',
           tabBarIcon: ({ color, size }) => <Ionicons name="today" color={color} size={size} />,
         }}
       />
@@ -27,6 +29,8 @@ export default function TabsLayout() {
         name="records"
         options={{
           title: '기록',
+          // 기본 라벨이 `, 기록`처럼 앞에 쉼표가 붙어 낭독된다.
+          tabBarAccessibilityLabel: '기록',
           tabBarIcon: ({ color, size }) => <Ionicons name="list" color={color} size={size} />,
         }}
       />
@@ -34,6 +38,8 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: '설정',
+          // 기본 라벨이 `, 설정`처럼 앞에 쉼표가 붙어 낭독된다.
+          tabBarAccessibilityLabel: '설정',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),

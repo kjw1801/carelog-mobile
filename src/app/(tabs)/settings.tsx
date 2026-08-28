@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import Constants from 'expo-constants';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -28,6 +28,11 @@ export default function SettingsScreen() {
   // 조회에 성공해야 true. 실패한 채로 저장하면 빈 화면 값이 기존 설정을 덮어쓴다.
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // 저장 요청이 도는 동안 값을 바꾸면, 끝난 뒤 setName(trimmed)가 새 입력을
+  // 덮거나 날짜가 화면과 DB로 갈린다. 입력 전체를 함께 잠근다.
+  // setState는 다음 렌더에야 반영된다. 실제 잠금은 ref로 건다.
+  const savingRef = useRef(false);
 
   // 포커스마다 읽지 않는다. 설정은 이 화면에서만 바뀌므로 다시 읽을 이유가 없고,
   // 포커스마다 덮어쓰면 탭을 오가는 것만으로 작성 중인 값이 사라진다.
@@ -58,7 +63,9 @@ export default function SettingsScreen() {
   }
 
   async function onSave() {
-    if (!loaded) return;
+    if (!loaded || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     Keyboard.dismiss();
     const trimmed = name.trim();
     try {
@@ -71,6 +78,9 @@ export default function SettingsScreen() {
       Alert.alert('저장했습니다');
     } catch {
       Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
@@ -89,7 +99,8 @@ export default function SettingsScreen() {
           placeholder="예: 정우"
           placeholderTextColor="#b0b0b5"
           returnKeyType="done"
-          editable={loaded}
+          maxLength={20}
+          editable={loaded && !saving}
           accessibilityLabel="아이 이름"
         />
 
@@ -98,9 +109,13 @@ export default function SettingsScreen() {
           <Pressable
             style={[styles.chip, styles.chipFlex]}
             onPress={() => setShowPicker(true)}
-            disabled={!loaded}
+            disabled={!loaded || saving}
             accessibilityRole="button"
-            accessibilityLabel="생년월일 선택">
+            accessibilityLabel={
+              birthDate
+                ? `생년월일 ${formatCalendarDate(birthDate)}, 변경`
+                : '생년월일, 선택하지 않음, 선택'
+            }>
             <Text style={birthDate ? styles.chipText : styles.chipPlaceholder}>
               {birthDate ? formatCalendarDate(birthDate) : '선택하지 않음'}
             </Text>
@@ -110,6 +125,7 @@ export default function SettingsScreen() {
             <Pressable
               style={styles.clearButton}
               onPress={() => setBirthDate(null)}
+              disabled={saving}
               accessibilityRole="button"
               accessibilityLabel="생년월일 선택 해제">
               <Text style={styles.clearButtonText}>선택 해제</Text>
@@ -125,11 +141,11 @@ export default function SettingsScreen() {
         ) : null}
 
         <Pressable
-          style={[styles.saveButton, !loaded && styles.saveButtonDisabled]}
+          style={[styles.saveButton, (!loaded || saving) && styles.saveButtonDisabled]}
           onPress={onSave}
-          disabled={!loaded}
+          disabled={!loaded || saving}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !loaded }}>
+          accessibilityState={{ disabled: !loaded || saving }}>
           <Text style={styles.saveButtonText}>저장</Text>
         </Pressable>
 

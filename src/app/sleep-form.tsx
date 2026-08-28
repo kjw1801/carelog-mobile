@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -34,6 +34,10 @@ export default function SleepFormScreen() {
   const [noteText, setNoteText] = useState('');
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [ready, setReady] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // setState는 다음 렌더에야 반영된다. 실제 잠금은 ref로 건다.
+  // 이 화면은 기존 수면을 UPDATE만 하므로 중복 수정 요청과 화면 전환을 막는다.
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +71,7 @@ export default function SleepFormScreen() {
   }
 
   async function onSave() {
+    if (savingRef.current) return;
     if (startedAt > Date.now()) {
       Alert.alert('입력을 확인해 주세요', '미래 시각은 기록할 수 없습니다.');
       return;
@@ -85,15 +90,25 @@ export default function SleepFormScreen() {
     }
 
     const note = noteText.trim();
-    await updateSleep(db, sleepId, {
-      startedAt,
-      endedAt,
-      note: note === '' ? null : note,
-    });
-    router.back();
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await updateSleep(db, sleepId, {
+        startedAt,
+        endedAt,
+        note: note === '' ? null : note,
+      });
+      router.back();
+    } catch {
+      Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
 
   function onDelete() {
+    if (savingRef.current) return;
     Alert.alert('이 수면 기록을 삭제할까요?', '되돌릴 수 없습니다.', [
       { text: '취소', style: 'cancel' },
       {
@@ -120,12 +135,16 @@ export default function SleepFormScreen() {
       <View style={styles.row}>
         <Pressable
           style={styles.chip}
-          onPress={() => setPicker({ field: 'start', mode: 'date' })}>
+          onPress={() => setPicker({ field: 'start', mode: 'date' })}
+          accessibilityRole="button"
+          accessibilityLabel={`시작 날짜 ${formatDay(startedAt)}, 변경`}>
           <Text style={styles.chipText}>{formatDay(startedAt)}</Text>
         </Pressable>
         <Pressable
           style={styles.chip}
-          onPress={() => setPicker({ field: 'start', mode: 'time' })}>
+          onPress={() => setPicker({ field: 'start', mode: 'time' })}
+          accessibilityRole="button"
+          accessibilityLabel={`시작 시각 ${formatTimeOfDay(startedAt)}, 변경`}>
           <Text style={styles.chipText}>{formatTimeOfDay(startedAt)}</Text>
         </Pressable>
       </View>
@@ -136,7 +155,11 @@ export default function SleepFormScreen() {
           <View style={styles.activeChip}>
             <Text style={styles.activeChipText}>진행 중</Text>
           </View>
-          <Pressable style={styles.nowChip} onPress={() => setEndedAt(Date.now())}>
+          <Pressable
+            style={styles.nowChip}
+            onPress={() => setEndedAt(Date.now())}
+            accessibilityRole="button"
+            accessibilityLabel="지금 시각으로 종료">
             <Text style={styles.nowChipText}>지금 종료</Text>
           </Pressable>
         </View>
@@ -144,12 +167,16 @@ export default function SleepFormScreen() {
         <View style={styles.row}>
           <Pressable
             style={styles.chip}
-            onPress={() => setPicker({ field: 'end', mode: 'date' })}>
+            onPress={() => setPicker({ field: 'end', mode: 'date' })}
+            accessibilityRole="button"
+            accessibilityLabel={`종료 날짜 ${formatDay(endedAt)}, 변경`}>
             <Text style={styles.chipText}>{formatDay(endedAt)}</Text>
           </Pressable>
           <Pressable
             style={styles.chip}
-            onPress={() => setPicker({ field: 'end', mode: 'time' })}>
+            onPress={() => setPicker({ field: 'end', mode: 'time' })}
+            accessibilityRole="button"
+            accessibilityLabel={`종료 시각 ${formatTimeOfDay(endedAt)}, 변경`}>
             <Text style={styles.chipText}>{formatTimeOfDay(endedAt)}</Text>
           </Pressable>
         </View>
@@ -170,11 +197,21 @@ export default function SleepFormScreen() {
         accessibilityLabel="메모, 선택 입력"
       />
 
-      <Pressable style={styles.saveButton} onPress={onSave} accessibilityRole="button">
+      <Pressable
+        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        onPress={onSave}
+        disabled={saving}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: saving }}>
         <Text style={styles.saveButtonText}>수정</Text>
       </Pressable>
 
-      <Pressable style={styles.deleteButton} onPress={onDelete} accessibilityRole="button">
+      <Pressable
+        style={styles.deleteButton}
+        onPress={onDelete}
+        disabled={saving}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: saving }}>
         <Text style={styles.deleteButtonText}>삭제</Text>
       </Pressable>
 
@@ -237,6 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a84ff',
     alignItems: 'center',
   },
+  saveButtonDisabled: { backgroundColor: '#b0c9e5' },
   saveButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
   deleteButton: { marginTop: 8, paddingVertical: 18, alignItems: 'center' },
   deleteButtonText: { fontSize: 17, color: '#ff3b30' },
