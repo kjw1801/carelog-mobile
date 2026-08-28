@@ -16,13 +16,21 @@ import {
 } from 'react-native';
 
 import {
+  BREAST_SIDE_LABEL,
+  FEEDING_KIND_LABEL,
   deleteFeeding,
   getFeeding,
   insertFeeding,
   updateFeeding,
+  type BreastSide,
+  type NewFeedingKind,
+  type StoredFeedingInput,
 } from '@/db/feedings';
 import { parseAmount } from '@/lib/amount';
 import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
+
+const KINDS: NewFeedingKind[] = ['breast', 'formula'];
+const SIDES: BreastSide[] = ['left', 'right', 'both'];
 
 export default function FeedingFormScreen() {
   const db = useSQLiteContext();
@@ -31,6 +39,14 @@ export default function FeedingFormScreen() {
   const isEditing = feedingId !== null;
 
   const [occurredAt, setOccurredAt] = useState(() => Date.now());
+  // 새 기록은 종류를 고르기 전까지 null이다. 기본값을 주면 고르지 않은 채
+  // 저장돼 사실이 아닌 종류가 남는다.
+  //
+  // 기존 기록(unspecified)을 열면 여기도 null이다. 그대로 저장하면
+  // unspecified가 유지되고, 모유·분유를 고르면 그때 전환된다.
+  const [kind, setKind] = useState<NewFeedingKind | null>(null);
+  const [wasUnspecified, setWasUnspecified] = useState(false);
+  const [side, setSide] = useState<BreastSide | null>(null);
   const [amountText, setAmountText] = useState('');
   const [noteText, setNoteText] = useState('');
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
@@ -51,6 +67,9 @@ export default function FeedingFormScreen() {
         return;
       }
       setOccurredAt(row.occurred_at);
+      setKind(row.kind === 'unspecified' ? null : row.kind);
+      setWasUnspecified(row.kind === 'unspecified');
+      setSide(row.side);
       setAmountText(row.amount_ml === null ? '' : String(row.amount_ml));
       setNoteText(row.note ?? '');
       setReady(true);
@@ -67,8 +86,23 @@ export default function FeedingFormScreen() {
     if (mode) setOccurredAt(mergePickedDateTime(occurredAt, selected, mode));
   }
 
+  // 종류를 바꾸면 반대쪽 입력을 버린다. 남겨두면 모유인데 양이 붙거나
+  // 분유인데 위치가 붙어 DB CHECK에 걸린다.
+  function onPickKind(next: NewFeedingKind) {
+    setKind(next);
+    if (next === 'breast') setAmountText('');
+    else setSide(null);
+  }
+
   async function onSave() {
     if (savingRef.current) return;
+
+    // 기존 기록은 종류를 고르지 않아도 저장할 수 있다. 새 기록은 못 한다 —
+    // 고르지 않은 채 저장되면 unspecified가 새로 생겨난다.
+    if (kind === null && !wasUnspecified) {
+      Alert.alert('입력을 확인해 주세요', '수유 종류를 선택해 주세요.');
+      return;
+    }
     const amount = parseAmount(amountText);
     if (!amount.ok) {
       Alert.alert('입력을 확인해 주세요', amount.message);
@@ -82,17 +116,36 @@ export default function FeedingFormScreen() {
     }
 
     const note = noteText.trim();
-    const input = {
-      occurredAt,
-      amountMl: amount.value,
-      note: note === '' ? null : note,
-    };
+    const base = { occurredAt, note: note === '' ? null : note };
+
+    // 종류별로 반대쪽 열을 null로 못 박는다. 캐스트를 쓰지 않고 분기 안에서
+    // 좁혀야 판별 유니온이 실제로 조합을 막는다.
+    let stored: StoredFeedingInput;
+    if (kind === 'breast') {
+      if (side === null) {
+        Alert.alert('입력을 확인해 주세요', '모유는 위치를 선택해 주세요.');
+        return;
+      }
+      stored = { ...base, kind, side, amountMl: null };
+    } else if (kind === 'formula') {
+      stored = { ...base, kind, side: null, amountMl: amount.value };
+    } else {
+      stored = { ...base, kind: 'unspecified', side: null, amountMl: amount.value };
+    }
 
     savingRef.current = true;
     setSaving(true);
     try {
-      if (feedingId === null) await insertFeeding(db, input);
-      else await updateFeeding(db, feedingId, input);
+      if (feedingId !== null) {
+        await updateFeeding(db, feedingId, stored);
+      } else if (stored.kind === 'unspecified') {
+        // 새 기록은 위에서 종류를 강제하므로 여기에 오지 않는다. 캐스트 대신
+        // 이 분기를 둬야 insertFeeding에 NewFeedingInput만 넘어가는 것이
+        // 타입으로 보장된다.
+        throw new Error('새 기록에는 수유 종류가 있어야 한다');
+      } else {
+        await insertFeeding(db, stored);
+      }
       router.back();
     } catch {
       Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
@@ -152,18 +205,72 @@ export default function FeedingFormScreen() {
         </Pressable>
       </View>
 
-      <Text style={styles.label}>수유량 (선택)</Text>
-      <TextInput
-        style={styles.input}
-        value={amountText}
-        onChangeText={setAmountText}
-        keyboardType="number-pad"
-        placeholder="모르면 비워 두세요"
-        placeholderTextColor="#b0b0b5"
-        returnKeyType="done"
-        accessibilityLabel="수유량, 밀리리터, 선택 입력"
-      />
-      <Text style={styles.hint}>비워 두면 양을 기록하지 않은 수유로 저장됩니다.</Text>
+      <Text style={styles.label}>수유 종류</Text>
+      <View style={styles.row}>
+        {KINDS.map((value) => {
+          const selected = kind === value;
+          return (
+            <Pressable
+              key={value}
+              style={selected ? selectedChipStyle : styles.kindChip}
+              onPress={() => onPickKind(value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}>
+              <Text style={selected ? selectedChipTextStyle : styles.kindText}>
+                {FEEDING_KIND_LABEL[value]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {kind === null && wasUnspecified ? (
+        <Text style={styles.hint}>
+          기존 기록이라 수유 종류가 지정되지 않았습니다. 고르지 않고 저장해도 됩니다.
+        </Text>
+      ) : null}
+
+      {kind === 'breast' ? (
+        <>
+          <Text style={styles.label}>위치</Text>
+          <View style={styles.row}>
+            {SIDES.map((value) => {
+              const selected = side === value;
+              return (
+                <Pressable
+                  key={value}
+                  style={selected ? selectedChipStyle : styles.kindChip}
+                  onPress={() => setSide(value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}>
+                  <Text style={selected ? selectedChipTextStyle : styles.kindText}>
+                    {BREAST_SIDE_LABEL[value]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
+      {/* 종류를 고르기 전에는 수유량을 받지 않는다. 먼저 적게 두면 모유를
+          고르는 순간 그 값이 버려진다. 기존 기록은 이미 양이 있을 수 있어
+          종류가 없어도 보여준다. */}
+      {kind === 'formula' || (kind === null && wasUnspecified) ? (
+        <>
+          <Text style={styles.label}>수유량 (선택)</Text>
+          <TextInput
+            style={styles.input}
+            value={amountText}
+            onChangeText={setAmountText}
+            keyboardType="number-pad"
+            placeholder="모르면 비워 두세요"
+            placeholderTextColor="#b0b0b5"
+            returnKeyType="done"
+            accessibilityLabel="수유량, 밀리리터, 선택 입력"
+          />
+          <Text style={styles.hint}>비워 두면 양을 기록하지 않은 수유로 저장됩니다.</Text>
+        </>
+      ) : null}
 
       <Text style={styles.label}>메모 (선택)</Text>
       <TextInput
@@ -213,6 +320,16 @@ export default function FeedingFormScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  kindChip: {
+    flex: 1,
+    backgroundColor: '#f2f2f7',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  kindChipSelected: { backgroundColor: '#0a84ff' },
+  kindText: { fontSize: 16, color: '#1c1c1e' },
+  kindTextSelected: { color: '#fff', fontWeight: '700' },
   // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
   // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
   content: { padding: 20, paddingBottom: 120, gap: 8 },
@@ -255,3 +372,6 @@ const styles = StyleSheet.create({
   deleteButton: { marginTop: 8, paddingVertical: 18, alignItems: 'center' },
   deleteButtonText: { fontSize: 17, color: '#ff3b30' },
 });
+
+const selectedChipStyle = StyleSheet.flatten([styles.kindChip, styles.kindChipSelected]);
+const selectedChipTextStyle = StyleSheet.flatten([styles.kindText, styles.kindTextSelected]);

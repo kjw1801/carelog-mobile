@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { DIAPER_KIND_LABEL } from '@/db/diapers';
+import { BREAST_SIDE_LABEL, FEEDING_KIND_LABEL } from '@/db/feedings';
 import { listTimeline, type TimelineEntry } from '@/db/timeline';
 import { formatDay, formatDuration, formatTimeOfDay, isSameDay } from '@/lib/time';
 
@@ -38,7 +39,17 @@ const TITLE: Record<TimelineEntry['type'], string> = {
  */
 function detail(entry: TimelineEntry): string | null {
   if (entry.type === 'feeding') {
-    return entry.amount_ml === null ? null : `${entry.amount_ml}ml`;
+    const amount = entry.amount_ml === null ? null : `${entry.amount_ml}ml`;
+    if (entry.feeding_kind === 'breast') {
+      return entry.feeding_side === null ? '모유' : `모유 ${BREAST_SIDE_LABEL[entry.feeding_side]}`;
+    }
+    if (entry.feeding_kind === 'formula') {
+      const label = FEEDING_KIND_LABEL.formula;
+      return amount === null ? label : `${label} ${amount}`;
+    }
+    // v4까지의 기록. 양만 보여주면 분유로 오해한다 — 추정하지 않으려고
+    // unspecified를 뒀는데 화면에서 감추면 의미가 없다.
+    return amount === null ? '기존 기록' : `기존 기록 · ${amount}`;
   }
   if (entry.type === 'diaper') {
     return entry.diaper_kind === null ? null : DIAPER_KIND_LABEL[entry.diaper_kind];

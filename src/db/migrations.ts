@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -89,6 +89,56 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
         );
       `);
       current = 4;
+    }
+
+    if (current < 5) {
+      // 수유를 모유와 분유로 나눈다. 모유는 양이 없고 위치가 있고, 분유는
+      // 위치가 없고 양이 선택이다. 서로의 열이 비어 있어야 한다는 규칙을
+      // 앱에서만 지키면 언젠가 어긋나므로 CHECK로 못 박는다.
+      //
+      // v4까지의 기록은 종류를 알 수 없다. 양이 없으면 모유였을 수도, 양을
+      // 적지 않은 분유였을 수도 있고, 양이 있어도 유축한 모유였을 수 있다.
+      // 추정하지 않고 'unspecified'로 보존한다. 새 기록은 이 값으로 저장하지
+      // 않으며, 그 금지는 DB가 아니라 insertFeeding의 타입이 맡는다 —
+      // DB는 기존 행 때문에 이 값을 허용해야 해서 구분할 수 없다.
+      //
+      // SQLite는 열 추가로 이런 교차 CHECK를 붙일 수 없어 테이블을 다시
+      // 만든다. 인덱스는 테이블과 함께 사라지므로 마지막에 다시 만든다.
+      //
+      // amount_ml에 typeof 검사를 더한다. INTEGER 선언만으로는 1.5가 통과한다.
+      await txn.execAsync(`
+        CREATE TABLE feedings_v5 (
+          id          INTEGER PRIMARY KEY NOT NULL,
+          occurred_at INTEGER NOT NULL,
+          kind        TEXT NOT NULL
+                      CHECK (kind IN ('breast', 'formula', 'unspecified')),
+          side        TEXT CHECK (side IS NULL OR side IN ('left', 'right', 'both')),
+          amount_ml   INTEGER CHECK (
+                        amount_ml IS NULL OR
+                        (typeof(amount_ml) = 'integer' AND amount_ml > 0)
+                      ),
+          note        TEXT,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL,
+          CHECK (
+            (kind = 'breast' AND side IS NOT NULL AND amount_ml IS NULL) OR
+            (kind = 'formula' AND side IS NULL) OR
+            (kind = 'unspecified' AND side IS NULL)
+          )
+        );
+
+        INSERT INTO feedings_v5
+          (id, occurred_at, kind, side, amount_ml, note, created_at, updated_at)
+          SELECT id, occurred_at, 'unspecified', NULL, amount_ml, note,
+                 created_at, updated_at
+            FROM feedings;
+
+        DROP TABLE feedings;
+        ALTER TABLE feedings_v5 RENAME TO feedings;
+
+        CREATE INDEX idx_feedings_occurred_at ON feedings(occurred_at);
+      `);
+      current = 5;
     }
 
     // PRAGMA는 바인딩 파라미터를 받지 않는다. 값은 이 파일의 상수다.

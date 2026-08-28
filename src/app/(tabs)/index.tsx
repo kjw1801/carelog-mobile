@@ -43,7 +43,7 @@ const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 export default function TodayScreen() {
   const db = useSQLiteContext();
   const [last, setLast] = useState<Feeding | null>(null);
-  const [summary, setSummary] = useState<TodaySummary>({ count: 0, amountMl: null });
+  const [summary, setSummary] = useState<TodaySummary>({ count: 0, formulaMl: null });
   const [diaperCount, setDiaperCount] = useState(0);
   const [todaySleeps, setTodaySleeps] = useState<Sleep[]>([]);
   const [baby, setBaby] = useState<Baby | null>(null);
@@ -260,13 +260,15 @@ export default function TodayScreen() {
               <Text style={styles.cardValue} numberOfLines={1}>{formatDurationCompact(sleepMs)}</Text>
             )}
           </View>
-          {/* 오늘 수유량을 한 번도 입력하지 않았다면 0ml이 아니라 "기록 없음"이다. */}
+          {/* 분유만 더한다. 모유는 양이 없고, 종류를 물어보기 전에 적힌 양은
+              분유였는지 알 수 없다. 한 번도 입력하지 않았다면 0ml이 아니라
+              "기록 없음"이다. */}
           <View style={cardHalfStyle}>
-            <Text style={styles.cardLabel}>입력된 수유량</Text>
-            {summary.amountMl === null ? (
+            <Text style={styles.cardLabel}>오늘 분유량</Text>
+            {summary.formulaMl === null ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue} numberOfLines={1}>{summary.amountMl}ml</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>{summary.formulaMl}ml</Text>
             )}
           </View>
         </View>
