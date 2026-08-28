@@ -286,15 +286,15 @@ export default function TodayScreen() {
       </View>
 
       <Pressable
-        style={activeSleep ? sleepActiveStyle : sleepStartButtonStyle}
+        style={sleepButtonStyle(activeSleep !== null, sleepOverdue)}
         onPress={onPressSleep}
         disabled={toggling}
         accessibilityRole="button"
         accessibilityState={{ disabled: toggling }}
         accessibilityLabel={sleepAccessibilityLabel}>
         <View style={styles.sleepMain}>
-          <Ionicons name="moon" size={18} color="#c7c6d4" />
-          <Text style={sleepOverdue ? sleepOverdueTextStyle : styles.addButtonText}>
+          <Ionicons name="moon" size={18} color={activeSleep ? '#fff' : '#c7c6d4'} />
+          <Text style={styles.addButtonText}>
             {activeSleep ? `수면 중 · ${elapsedSleep}` : '수면 시작'}
           </Text>
         </View>
@@ -332,7 +332,14 @@ const styles = StyleSheet.create({
   },
   inRow: { flex: 1 },
   diaperButton: { backgroundColor: '#34a853' },
+  // 버튼 전체 색이 바뀌어야 상태가 바뀐 것으로 읽힌다. 아이콘과 글자만
+  // 바꾸면 눌렀는지 아닌지 알기 어렵다.
+  //
+  // 12시간을 넘기면 한 단계 더 진한 색으로 간다. 주황 위에 노란 글씨를 얹으면
+  // 대비가 나빠 안내가 묻힌다.
   sleepStartButton: { backgroundColor: '#3f3d56' },
+  sleepActiveButton: { backgroundColor: '#ff9500' },
+  sleepOverdueButton: { backgroundColor: '#e8590c' },
   // 수면 컨트롤은 위 두 버튼과 같은 addButton을 쓴다. 한 줄에 같은 글자 크기라
   // 높이가 따로 지정하지 않아도 같아진다. 숫자로 박으면 글자 크기를 키운
   // 기기에서 어긋난다.
@@ -346,8 +353,7 @@ const styles = StyleSheet.create({
   },
   sleepRowActive: { justifyContent: 'space-between', paddingHorizontal: 20 },
   sleepMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sleepEnd: { fontSize: 15, fontWeight: '700', color: '#c7c6d4' },
-  sleepOverdueText: { color: '#ffcc66' },
+  sleepEnd: { fontSize: 15, fontWeight: '700', color: '#fff' },
   addButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 });
 
@@ -366,12 +372,19 @@ const sleepStartButtonStyle = StyleSheet.flatten([
 ]);
 const sleepActiveStyle = StyleSheet.flatten([
   styles.addButton,
-  styles.sleepStartButton,
+  styles.sleepActiveButton,
   styles.sleepRow,
   styles.sleepRowActive,
 ]);
-const sleepOverdueTextStyle = StyleSheet.flatten([
-  styles.addButtonText,
-  styles.sleepOverdueText,
+const sleepOverdueStyle = StyleSheet.flatten([
+  styles.addButton,
+  styles.sleepOverdueButton,
+  styles.sleepRow,
+  styles.sleepRowActive,
 ]);
+
+function sleepButtonStyle(active: boolean, overdue: boolean) {
+  if (!active) return sleepStartButtonStyle;
+  return overdue ? sleepOverdueStyle : sleepActiveStyle;
+}
 const cardHalfStyle = StyleSheet.flatten([styles.card, styles.cardHalf]);
