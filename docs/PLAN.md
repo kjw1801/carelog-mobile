@@ -445,6 +445,20 @@ side  TEXT            'left' | 'right' | 'both'   모유일 때만
   `CHECK`로 허용한다.
 - `amount_ml`의 기존 규칙(`NULL` 허용, 값이 있으면 0보다 큰 정수)은 그대로다.
   분유인데 양을 모를 수도 있다.
+- **테이블을 다시 만드는 김에 정수 제약을 실제로 건다.** 지금 `CHECK`는
+  `amount_ml > 0`뿐이라 `1.5`가 통과한다. SQLite의 `INTEGER`는 선언만으로
+  정수를 강제하지 않는다.
+
+  ```sql
+  CHECK (
+    amount_ml IS NULL OR
+    (typeof(amount_ml) = 'integer' AND amount_ml > 0)
+  )
+  ```
+
+  지금은 입력이 `keyboardType="number-pad"`라 소수점을 칠 수 없어 실제 노출은
+  좁다. 그래도 규칙이 "0보다 큰 정수"라고 선언돼 있으면 DB가 그걸 강제해야 하고,
+  나중에 가져오기 같은 경로가 생기면 폼을 우회한다.
 - SQLite는 `ADD COLUMN`으로 이런 교차 `CHECK`를 붙이기 어렵다. 새 테이블을
   만들고 복사한 뒤 이름을 바꾸는 표준 절차로 간다. `sleeps`처럼 부분 유니크
   인덱스가 걸린 테이블이 아니라 옮길 인덱스는 `idx_feedings_occurred_at` 하나다.
@@ -469,8 +483,9 @@ amount_ml   기존 값 그대로
 `unspecified`는 마이그레이션된 기존 기록에만 쓴다. **입력 화면에는 모유·분유
 둘만 보여주고 새 기록은 이 상태로 저장되지 않는다.**
 
-마지막으로 확인했을 때 기기의 수유 기록은 0건이라 실제로 옮길 행은 없다.
-그래도 마이그레이션은 행이 있는 DB에서도 맞아야 한다.
+구현 전에 v4 기준 데이터를 준비했다 — 수유량 `NULL` 1건과 `120ml` 1건, 두 행의
+`id`·`occurred_at`·`amount_ml`·`note`·`created_at`·`updated_at`을 기록해 뒀고
+DB 사본도 보관했다. 마이그레이션 후 이 값들을 그대로 대조한다.
 
 #### 입력 화면
 
@@ -563,6 +578,11 @@ amount_ml   기존 값 그대로
 오해한다 — 추정하지 않으려고 `unspecified`를 뒀는데 화면에서 감추면 의미가
 없어진다. 양이 없으면 빈칸 대신 `기존 기록`만 남는다.
 
+**`src/db/timeline.ts`도 함께 고친다.** Records는 `feedings`를 직접 읽지 않고
+통합 타임라인을 거친다. `TimelineEntry`에 `feeding_kind`·`feeding_side`를 넣고
+`UNION ALL`의 수유 절에서 두 열을 뽑아야 한다. 다른 두 절은 `NULL`로 자리를
+맞춘다 — 기저귀의 `diaper_kind`, 수면의 `sleep_ended_at`과 같은 방식이다.
+
 **종류 열은 `수유`로 두고 모유·분유는 값 열에 넣는다.** 종류 열에 `모유`/`분유`를
 직접 쓰는 안도 있으나, 기저귀에서 `소변+대변`을 종류 열에서 값 열로 옮겨 세 줄
 구조를 통일한 결정과 어긋난다. 수유만 종류 열이 둘로 쪼개진다. 바꾸려면 기저귀도
@@ -596,8 +616,14 @@ amount_ml   기존 값 그대로
 
 제약
 
-- `kind`는 세 값만, `side`는 세 값만 `CHECK`가 허용한다.
-- 모유 + 수유량, 분유 + 위치 같은 잘못된 조합을 `CHECK`가 거부한다.
+- `kind`는 `breast`·`formula`·`unspecified` 세 값만 허용한다.
+- `side`는 `NULL`이거나 `left`·`right`·`both` 중 하나다. `NULL`도 정상값이다 —
+  분유와 기존 기록은 반드시 `NULL`이어야 한다.
+- `breast`는 `side`가 반드시 세 값 중 하나여야 한다. `breast` + `side NULL`을
+  거부한다.
+- 모유 + 수유량, 분유 + 위치 같은 잘못된 조합을 거부한다.
+- `side`에 임의 문자열을 넣으면 거부한다.
+- `amount_ml`은 `NULL`과 양의 정수만 허용한다. `1.5`, `0`, 음수는 거부한다.
 - 새 기록에서는 `unspecified`가 생기지 않는다 — DB가 아니라 `insertFeeding`의
   타입이 막는다.
 
