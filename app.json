@@ -4,18 +4,16 @@
     "slug": "carelog",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/annyeongaga-icon.png",
     "scheme": "carelog",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/annyeongaga-icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FEF5DF",
+        "foregroundImage": "./assets/images/annyeongaga-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.kjw1801.carelog"
