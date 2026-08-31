@@ -19,5 +19,11 @@ export function parseAmount(raw: string): ParsedAmount {
   if (value <= 0) {
     return { ok: false, message: '수유량은 0보다 커야 합니다. 모르면 비워 두세요.' };
   }
+  // 자릿수가 너무 크면 Number가 안전 정수 범위를 넘어 SQLite에 REAL로 바인딩된다.
+  // 그러면 `typeof(amount_ml) = 'integer'` CHECK에 걸려 "저장하지 못했습니다"가
+  // 뜬다 — 입력 오류인데 저장 실패로 보인다. 여기서 입력 오류로 돌려준다.
+  if (!Number.isSafeInteger(value)) {
+    return { ok: false, message: '수유량이 너무 큽니다.' };
+  }
   return { ok: true, value };
 }

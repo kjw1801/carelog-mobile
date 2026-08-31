@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/annyeongaga-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.kjw1801.carelog"
+      "package": "com.kjw1801.carelog",
+      "allowBackup": true
     },
     "web": {
       "output": "static",
