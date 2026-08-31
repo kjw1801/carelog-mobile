@@ -38,4 +38,5 @@ npx expo start --dev-client
 
 V1은 Android 전용이다. 계획은 [docs/PLAN.md](docs/PLAN.md)에 있다.
 
-출시 후 스크린샷과 주요 설계 판단을 이 문서에 추가한다.
+스크린샷과 주요 설계 판단은 출시 준비 단계에서 이 문서에 추가한다.
+Play 링크는 출시 후에 넣는다.
