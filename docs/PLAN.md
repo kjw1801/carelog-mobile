@@ -690,7 +690,12 @@ CHECK 13가지를 전수로 넣어봤다. `kind`·`side` 임의 문자열, 모�
 8. Health apps 선언 양식 작성 — Play에 게시하는 모든 앱이 제출 대상이다.
    수면 기록이 공식 예시상 건강 기능에 해당할 가능성이 높으므로 그에 맞는
    건강 기능 분류를 고른다
-9. production AAB → 내부 테스트 → Android 출시
+9. 템플릿 에셋과 웹 의존성 정리 — 제거 후 `npx expo install --check`,
+   `npm test`, `npx tsc --noEmit`, `npm run lint`를 모두 확인한다.
+   `@expo/ui`·`expo-glass-effect`·`expo-symbols`는 `expo-router` 의존성이라
+   `package.json`에서 빼도 설치본에 남고, `expo-status-bar`는 Router 설치
+   목록에 있으므로 유지한다
+10. production AAB → 내부 테스트 → Android 출시
 
 #### 개인정보 처리방침
 
@@ -730,7 +735,7 @@ CHECK 13가지를 전수로 넣어봤다. `kind`·`side` 임의 문자열, 모�
 
 **README는 완성했다.** 스크린샷 4장(`docs/screenshots/`), 핵심 기능, 기술 스택,
 주요 설계 판단 여섯 가지, 테스트와 실기기 검증, 실행 방법, V1 범위를 담았다.
-Play 링크는 출시 후에 넣는다. 남은 템플릿 에셋과 웹 의존성 정리는 아직이다.
+Play 링크는 출시 후에 넣는다.
 
 스크린샷은 화면이 확정된 뒤에 찍었다. 먼저 찍었다면 수면 컨트롤과 수유 종류
 분리 때 다시 찍어야 했다.
