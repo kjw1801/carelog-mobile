@@ -147,11 +147,13 @@ export default function SettingsScreen() {
         </Pressable>
 
         <View style={styles.about}>
-          <Text style={styles.aboutTitle}>carelog</Text>
+          {/* 이름을 하드코딩하면 표시 이름을 바꿀 때 이 화면만 뒤처진다.
+              읽지 못했을 때의 대체 문구도 이름이 아니어야 한다. */}
+          <Text style={styles.aboutTitle}>
+            {Constants.expoConfig?.name ?? '앱 정보'}
+          </Text>
           <Text style={styles.aboutLine}>버전 {Constants.expoConfig?.version ?? '-'}</Text>
-          {/* `기기에만 저장됩니다`라고 쓰지 않는다. android.allowBackup을
-              지정하지 않아 기본값 true이고, 자동 백업으로 사용자 클라우드에
-              올라갈 수 있다. 6단계에서 막을지 정한다. */}
+          {/* 자동 백업을 허용하므로 `기기에만 저장됩니다`라고 안내하지 않는다. */}
           <Text style={styles.aboutLine}>로그인 없이 사용할 수 있습니다.</Text>
         </View>
 
