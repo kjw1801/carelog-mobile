@@ -135,7 +135,7 @@ SQLite 초기화 / 기록 추가 / Today의 마지막 수유·오늘 횟수 /
 Records 시간순 목록 / 수정·삭제 / 앱 재시작 후에도 유지.
 
 - [x] 실기기 검증 완료
-- [x] development build 구성 (`com.kjw1801.carelog`, EAS `development` 프로필)
+- [x] development build 구성 (EAS `development` 프로필)
 
 ### 2단계 — 기저귀 ✅
 소변·대변·둘 다 / 기록 시각 / Today 횟수 / Records 통합 타임라인 / 수정·삭제.
@@ -779,7 +779,9 @@ V1은 자동 백업을 허용한다.
 ```
 홈 화면 · app.json name    안녕아가
 Play 제목                  안녕아가 - 수유·기저귀·수면 기록      19자
-저장소 · slug · 패키지      carelog / com.kjw1801.carelog 유지
+저장소 · slug                carelog 유지 (내부 식별자)
+패키지                      com.woojulab.annyeongaga
+scheme                      annyeongaga
 ```
 
 기능을 그대로 옮긴 이름은 이미 다 쓰이고 있었다. Play 검색에서 `CareLog`,
@@ -798,7 +800,14 @@ Play 제목                  안녕아가 - 수유·기저귀·수면 기록    
 검토한다. Play의 사칭 정책은 이름이 겹치는지가 아니라 사용자가 기존 업체와
 관계있다고 오인할 정도인지를 본다. 기존 업체와의 관계를 암시하지 않고,
 독자적인 로고와 설명을 사용한다.
-앱 식별자 `com.kjw1801.carelog`는 같은 스토어 앱의 업데이트에서 변경할 수 없다.
+**패키지명은 첫 Play 업로드 직전에 `com.woojulab.annyeongaga`로 바꿨다.**
+`kjw1801`은 개인 아이디였고 `carelog`는 개발 초기 가칭이라 둘 다 남길 이유가
+없었다. `woojulab`은 실제 사업자명이라 이후 다른 앱도 `com.woojulab.<앱이름>`으로
+통일할 수 있다. 첫 업로드 뒤에는 같은 스토어 앱의 업데이트에서 변경할 수 없으므로
+그전이 마지막 기회였다.
+
+`slug`, `package.json` 이름, SQLite 파일명은 내부 식별자라 `carelog` 그대로 둔다 —
+바꾸면 Expo 프로젝트 연결과 빌드 이력이 끊긴다.
 바꾸면 별개의 앱으로 취급된다.
 
 ## 범위

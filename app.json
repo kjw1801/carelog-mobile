@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/annyeongaga-icon.png",
-    "scheme": "carelog",
+    "scheme": "annyeongaga",
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/images/annyeongaga-icon.png"
@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/annyeongaga-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.kjw1801.carelog",
+      "package": "com.woojulab.annyeongaga",
       "allowBackup": true
     },
     "web": {
