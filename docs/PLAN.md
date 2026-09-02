@@ -690,12 +690,25 @@ CHECK 13가지를 전수로 넣어봤다. `kind`·`side` 임의 문자열, 모�
 8. Health apps 선언 양식 작성 — Play에 게시하는 모든 앱이 제출 대상이다.
    수면 기록이 공식 예시상 건강 기능에 해당할 가능성이 높으므로 그에 맞는
    건강 기능 분류를 고른다
-9. 템플릿 에셋과 웹 의존성 정리 — 제거 후 `npx expo install --check`,
-   `npm test`, `npx tsc --noEmit`, `npm run lint`를 모두 확인한다.
-   `@expo/ui`·`expo-glass-effect`·`expo-symbols`는 `expo-router` 의존성이라
-   `package.json`에서 빼도 설치본에 남고, `expo-status-bar`는 Router 설치
-   목록에 있으므로 유지한다
-10. production AAB → 내부 테스트 → Android 출시
+9. production AAB → 비공개 테스트 시작
+10. 테스트가 도는 14일 동안 템플릿 에셋과 웹 의존성 정리 — 제거 후
+    `npx expo install --check`, `npm test`, `npx tsc --noEmit`, `npm run lint`를
+    모두 확인한다. `@expo/ui`·`expo-glass-effect`·`expo-symbols`는
+    `expo-router` 의존성이라 `package.json`에서 빼도 설치본에 남고,
+    `expo-status-bar`는 Router 설치 목록에 있으므로 유지한다
+11. 최종 AAB → 프로덕션 출시
+
+**순서의 이유.** 신규 개인 계정은 프로덕션 신청 전에 **비공개 테스트에 12명이
+14일 연속 참여**해야 한다. 그 시계는 비공개 테스트를 시작해야 돌기 시작하므로,
+시작을 막는 것(처리방침·앱 내부 링크·데이터 보안·Health apps 선언)만 먼저 끝내고
+나머지는 테스트가 도는 동안 한다. **요건은 테스터가 연속으로 참여하는 것이지 같은
+AAB를 14일 유지하는 것이 아니라서, 중간에 업데이트를 올려도 참여 상태는 유지된다.**
+
+내부 테스트 트랙은 데이터 보안 양식 없이도 시작할 수 있지만 **12명·14일 요건에는
+포함되지 않는다.** 시계를 돌리려면 비공개 테스트여야 한다.
+
+`versionCode`를 하나 태우는 것은 실질적인 비용이 아니다. 번호가 비어도 되고
+공간도 넓다. 더 현실적인 비용은 EAS 빌드 시간과 무료 한도다.
 
 #### 개인정보 처리방침
 

@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Claude 실행 UI가 만드는 로컬 설정. 이 프로젝트 설정과 맞지도 않는다.
+.claude/launch.json
