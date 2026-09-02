@@ -8,6 +8,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,13 @@ import {
 
 import { getBaby, saveBaby } from '@/db/baby';
 import { formatCalendarDate, fromCalendarDate, toCalendarDate } from '@/lib/date';
+
+/**
+ * Play는 처리방침 링크를 콘솔과 **앱 안** 양쪽에 요구한다. 콘솔에만 넣으면 요건을
+ * 채우지 못한다. 문서 원본은 `docs/privacy.html`이고 GitHub Pages가 이 주소로
+ * 서빙한다. 콘솔에 등록한 주소와 같아야 하므로 바꿀 때 양쪽을 함께 고친다.
+ */
+const PRIVACY_URL = 'https://kjw1801.github.io/carelog-mobile/privacy.html';
 
 export default function SettingsScreen() {
   const db = useSQLiteContext();
@@ -59,6 +67,16 @@ export default function SettingsScreen() {
     setShowPicker(false);
     // 생년월일은 달력 날짜다. epoch로 두지 않는다.
     setBirthDate(toCalendarDate(selected));
+  }
+
+  async function onOpenPrivacy() {
+    try {
+      await Linking.openURL(PRIVACY_URL);
+    } catch {
+      // 열 브라우저가 없거나 실패한 경우. 주소를 그대로 보여 줘야 사용자가 직접
+      // 찾아갈 수 있다. `열지 못했습니다`만 띄우면 방침에 닿을 길이 없어진다.
+      Alert.alert('링크를 열지 못했습니다', PRIVACY_URL);
+    }
   }
 
   async function onSave() {
@@ -155,6 +173,13 @@ export default function SettingsScreen() {
           <Text style={styles.aboutLine}>버전 {Constants.expoConfig?.version ?? '-'}</Text>
           {/* 자동 백업을 허용하므로 `기기에만 저장됩니다`라고 안내하지 않는다. */}
           <Text style={styles.aboutLine}>로그인 없이 사용할 수 있습니다.</Text>
+          <Pressable
+            style={styles.aboutLinkButton}
+            onPress={onOpenPrivacy}
+            accessibilityRole="link"
+            accessibilityLabel="개인정보 처리방침, 브라우저에서 열기">
+            <Text style={styles.aboutLink}>개인정보 처리방침</Text>
+          </Pressable>
         </View>
 
         {showPicker ? (
@@ -220,4 +245,11 @@ const styles = StyleSheet.create({
   about: { marginTop: 40, gap: 4 },
   aboutTitle: { fontSize: 15, fontWeight: '600', color: '#3a3a3c' },
   aboutLine: { fontSize: 14, color: '#8a8a8e' },
+  // 글자 높이만으로는 터치 영역이 20dp도 되지 않는다. Material의 최소 터치 크기가
+  // 48dp라 높이를 그만큼 준다. `alignSelf`가 없으면 가로로 늘어나 옆의 빈 곳을
+  // 눌러도 브라우저가 열린다.
+  aboutLinkButton: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center' },
+  // 강조색 `#0a84ff`는 이 회색 배경에서 3.27:1이라 본문 대비 기준에 못 미친다.
+  // 어두운 파랑으로 5.71:1을 확보한다. 링크는 찾을 수 있어야 의미가 있다.
+  aboutLink: { fontSize: 14, color: '#0a5cbf' },
 });
