@@ -88,8 +88,8 @@ npx expo start --dev-client
 
 V1은 Android 전용이다. 표시 이름은 `안녕아가`, 패키지명은
 `com.woojulab.annyeongaga`다. 저장소 이름과 Expo `slug`, SQLite 파일명은 개발
-초기 이름인 `carelog`를 그대로 쓴다 — 내부 식별자라 바꿀 이유가 없고, 바꾸면
-Expo 프로젝트 연결과 빌드 이력이 끊긴다.
+초기 이름인 `carelog`를 그대로 쓴다 — 내부 식별자라 바꿀 실익이 없다.
+EAS 프로젝트 연결은 `extra.eas.projectId`가 담당한다.
 
 V1.1 이후로 미룬 것: 일령 표시, 통계 화면과 추이 그래프, 백업·가져오기,
 수동 다크모드, 수유 타이머, 유축, 알림, 여러 아이, 클라우드 동기화.
