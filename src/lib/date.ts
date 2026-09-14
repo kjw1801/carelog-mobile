@@ -29,3 +29,25 @@ export function formatCalendarDate(value: string): string {
   if (!date) return value;
   return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
+
+/**
+ * 생년월일부터 오늘까지의 경과 일수. **태어난 날이 `0`이다.**
+ *
+ * 이 앱의 `D+n`은 출생일을 `D+0`으로 센다. 다른 규칙으로 세는 표기와 섞이지
+ * 않도록 세는 기준은 이 함수 하나에만 둔다.
+ *
+ * **epoch 차이를 그대로 나누지 않는다.** 둘 다 달력 날짜라, 서머타임이 있는
+ * 지역에서는 하루가 23시간이나 25시간이 되어 경계에서 날짜가 하나 밀린다.
+ * 현지 자정끼리 빼고 반올림하면 그 ±1시간이 흡수된다.
+ *
+ * 해석할 수 없는 날짜와 **미래 생년월일은 `null`**이다. 입력기가 미래를 막고
+ * 있지만, 기기 시계를 되돌리면 이미 저장된 값이 미래가 될 수 있다.
+ * 그때 `D+-3` 같은 문자열을 화면에 내보내지 않는다.
+ */
+export function daysSinceBirth(birthDate: string, today: Date): number | null {
+  const birth = fromCalendarDate(birthDate);
+  if (!birth) return null;
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const days = Math.round((midnight.getTime() - birth.getTime()) / 86_400_000);
+  return days < 0 ? null : days;
+}

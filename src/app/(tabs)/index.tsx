@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, useFocusEffect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
+import { HeaderTitle, type HeaderTitleProps } from 'expo-router/react-navigation';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -29,6 +30,8 @@ import {
   startSleep,
   type Sleep,
 } from '@/db/sleeps';
+import { daysSinceBirth } from '@/lib/date';
+import { clampName } from '@/lib/name';
 import { calculateSleepDuration } from '@/lib/sleep';
 import {
   formatDuration,
@@ -215,11 +218,60 @@ export default function TodayScreen() {
 
   // 탭 라벨은 `오늘`로 두고 헤더 제목만 바꾼다. `title`은 둘 다 바꾼다.
   // setOptions가 매 렌더 새 객체를 받으면 불필요한 재설정이 생긴다.
-  const babyName = baby?.name;
-  const screenOptions = useMemo(
-    () => ({ headerTitle: babyName ? `${babyName}의 오늘` : '오늘' }),
-    [babyName],
-  );
+  // 원본과 표시용을 나눠 든다. 제한을 넣기 전에 저장된 긴 이름이 남아 있을 수
+  // 있어 **그릴 때만** 자른다. 저장된 값은 건드리지 않는다.
+  // 낭독은 잘린 쪽이 아니라 원본을 읽어야 한다 — 화면이 좁아서 줄인 것이지
+  // 이름이 그것인 게 아니다.
+  const fullBabyName = baby?.name ?? null;
+  const displayBabyName = fullBabyName ? clampName(fullBabyName) : null;
+  const birthDate = baby?.birth_date;
+  // `now`가 아니라 여기서 나온 **일수**를 의존성에 둔다. now는 1분마다 바뀌지만
+  // 이 값은 자정에만 바뀌므로, 헤더가 매분 다시 설정되지 않는다.
+  const dayCount = birthDate ? daysSinceBirth(birthDate, new Date(now)) : null;
+
+  // 제목을 문자열 하나로 넘기면 자리가 모자랄 때 **뒤에서부터** 잘린다. 뒤에
+  // 있는 `D+n`이 먼저 사라지는데, 그게 이 헤더에서 유일하게 새로 보려던 값이다.
+  // 이름 길이를 줄여도 작은 화면·큰 글꼴·`D+1000`에서 다시 같은 일이 생긴다.
+  //
+  // 그래서 두 조각으로 나눠 **이름만 줄어들게** 한다. 뒤쪽은 `flexShrink: 0`이라
+  // 접미부 자체가 들어갈 수 있는 폭이면 온전히 남고, 넘치는 건 이름이 말줄임으로
+  // 흡수한다. 기본 타이포를 그대로 쓰려고 헤더의 `HeaderTitle`을 그대로 쓴다.
+  const screenOptions = useMemo(() => {
+    const suffix = dayCount === null ? '' : ` · D+${dayCount}`;
+    if (!displayBabyName || !fullBabyName) {
+      return { headerTitle: `오늘${suffix}` };
+    }
+    return {
+      headerTitle: ({ onLayout, style, ...titleProps }: HeaderTitleProps) => (
+        // `onLayout`은 헤더가 **제목 전체의 폭**을 재려고 넘기는 것이다. 두
+        // 조각에 각각 주면 두 번 불려 마지막 조각의 폭으로 덮인다. 바깥에서
+        // 한 번만 잰다. `style`도 헤더가 주는 값이라 버리지 않고 앞에 깐다.
+        //
+        // 조각을 나눈 건 폭을 다루려는 것이지 제목을 둘로 만들려는 게 아니다.
+        // `HeaderTitle`은 각각 heading 역할을 달고 나오므로, 그대로 두면 낭독에
+        // 제목이 둘로 읽힌다. 바깥을 하나의 접근성 노드로 묶어 원래대로 되돌리고,
+        // 라벨에는 **자르지 않은** 이름을 준다.
+        <View
+          style={styles.headerTitle}
+          onLayout={onLayout}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={`${fullBabyName}의 오늘${suffix}`}>
+          <HeaderTitle
+            {...titleProps}
+            numberOfLines={1}
+            style={[style, styles.headerName]}>
+            {displayBabyName}
+          </HeaderTitle>
+          <HeaderTitle {...titleProps} style={[style, styles.headerSuffix]}>
+            {`의 오늘${suffix}`}
+          </HeaderTitle>
+        </View>
+      ),
+    };
+    // **원본도 의존성이다.** 앞부분이 같고 뒤만 바뀌면 표시 문자열은 그대로라
+    // 여기서 빠뜨리면 화면은 맞는데 낭독만 옛 이름으로 남는다.
+  }, [fullBabyName, displayBabyName, dayCount]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -313,6 +365,11 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7', padding: 20, gap: 12 },
+  // 이름만 줄어들게 하는 두 조각 제목. 컨테이너가 `flexShrink: 1`이라 헤더가
+  // 주는 폭 안에서 줄어들고, 그 줄어듦을 이름 쪽이 전부 받는다.
+  headerTitle: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  headerName: { flexShrink: 1 },
+  headerSuffix: { flexShrink: 0 },
   // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
   cards: { flex: 1 },
   // 끝까지 내렸을 때 마지막 카드가 경계에 붙지 않도록 여백을 준다.

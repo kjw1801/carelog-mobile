@@ -45,7 +45,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest && npm run test:dst",
+    "test:dst": "TZ=America/New_York jest --testMatch '**/src/**/*.spec.ts'"
   },
   "private": true,
   "jest": {

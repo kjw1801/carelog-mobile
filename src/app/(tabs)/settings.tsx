@@ -19,6 +19,7 @@ import {
 
 import { getBaby, saveBaby } from '@/db/baby';
 import { formatCalendarDate, fromCalendarDate, toCalendarDate } from '@/lib/date';
+import { clampName } from '@/lib/name';
 
 /**
  * Play는 처리방침 링크를 콘솔과 **앱 안** 양쪽에 요구한다. 콘솔에만 넣으면 요건을
@@ -50,6 +51,10 @@ export default function SettingsScreen() {
         if (!alive) return;
         // 행이 없는 것은 실패가 아니다. 처음 쓰는 사용자다.
         if (baby) {
+          // **불러올 때 자르지 않는다.** 제한을 넣기 전에 저장된 긴 이름을 여기서
+          // 자르면, 생년월일만 바꾸고 저장해도 이름이 조용히 영구 축약된다.
+          // 사용자가 건드리지 않은 값을 이 화면이 마음대로 줄여서는 안 된다.
+          // 새 제한은 `onChangeText`에서, 즉 직접 고칠 때만 적용한다.
           setName(baby.name ?? '');
           setBirthDate(baby.birth_date);
         }
@@ -110,11 +115,12 @@ export default function SettingsScreen() {
         <TextInput
           style={styles.input}
           value={name}
-          onChangeText={setName}
+          // `maxLength`는 글자 수만 세서 한글과 영문을 구분하지 못한다.
+          // 헤더에 들어갈 폭으로 잘라야 `D+n`이 밀려나지 않는다.
+          onChangeText={(text) => setName(clampName(text))}
           placeholder="예: 정우"
           placeholderTextColor="#b0b0b5"
           returnKeyType="done"
-          maxLength={20}
           editable={loaded && !saving}
           accessibilityLabel="아이 이름"
         />

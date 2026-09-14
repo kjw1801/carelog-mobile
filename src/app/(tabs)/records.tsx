@@ -108,19 +108,19 @@ export default function RecordsScreen() {
             <Pressable style={styles.row} accessibilityRole="button">
               <Text style={styles.time}>{formatTimeOfDay(item.occurred_at)}</Text>
               <View style={styles.body}>
-                <View style={styles.titleRow}>
-                  {/* 아이콘 대신 색 점을 쓴다. 기저귀에 어울리는 아이콘이 없어
-                      셋을 맞추려면 하나는 억지가 된다. 종류는 바로 옆에 있다. */}
-                  <View style={DOT_STYLE[item.type]} />
-                  <Text style={styles.title}>{TITLE[item.type]}</Text>
-                  {/* 값은 종류 바로 옆에 붙인다. flex로 밀어 오른쪽 끝에 두면
-                      한 줄인데도 눈이 두 번 움직인다. */}
-                  {sub ? (
-                    <Text style={styles.detail} numberOfLines={1}>
-                      {sub}
-                    </Text>
-                  ) : null}
-                </View>
+                {/* 아이콘 대신 색 점을 쓴다. 기저귀에 어울리는 아이콘이 없어
+                    셋을 맞추려면 하나는 억지가 된다. 종류는 바로 옆에 있다. */}
+                <View style={DOT_STYLE[item.type]} />
+                <Text style={styles.title}>{TITLE[item.type]}</Text>
+                {/* 값은 종류 바로 옆에 붙인다. flex로 밀어 오른쪽 끝에 두면
+                    한 줄인데도 눈이 두 번 움직인다. */}
+                {sub ? (
+                  <Text style={styles.detail} numberOfLines={1}>
+                    {sub}
+                  </Text>
+                ) : null}
+                {/* 메모만 오른쪽 끝이다. 줄을 하나 더 쓰면 목록이 두 배로 길어져
+                    훑어보기가 나빠진다. 남는 자리를 전부 차지하고 넘치면 잘린다. */}
                 {item.note ? (
                   <Text style={styles.note} numberOfLines={1}>
                     {item.note}
@@ -158,15 +158,16 @@ const styles = StyleSheet.create({
   // 카드도 테두리도 없다. 왼쪽 시각 열과 여백만으로 줄이 갈린다.
   row: { flexDirection: 'row', gap: 16, paddingVertical: 12 },
   time: { fontSize: 16, fontWeight: '700', color: '#1c1c1e', width: 64 },
-  body: { flex: 1, gap: 2 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   dotFeeding: { backgroundColor: '#0a84ff' },
   dotDiaper: { backgroundColor: '#34a853' },
   dotSleep: { backgroundColor: '#5b597a' },
   title: { fontSize: 16, fontWeight: '600', color: '#1c1c1e' },
   detail: { fontSize: 15, color: '#3a3a3c', flexShrink: 1 },
-  note: { fontSize: 14, color: '#8a8a8e' },
+  // `flex: 1`이라 남는 자리를 전부 가져가고, 짧아도 오른쪽 끝에 붙는다.
+  // 종류와 값이 먼저 자리를 잡은 뒤 남는 만큼만 쓰므로 그 둘을 밀어내지 않는다.
+  note: { flex: 1, textAlign: 'right', fontSize: 14, color: '#8a8a8e' },
 });
 
 const DOT_STYLE: Record<TimelineEntry['type'], object> = {
