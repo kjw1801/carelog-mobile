@@ -3,7 +3,7 @@
 육아 중 한 손으로 빠르게 수유·기저귀·수면을 기록하는 Android 앱.
 자체 계정이나 서버 없이 동작하며, 기록은 기기 SQLite에 저장한다.
 
-**[Google Play에서 받기](https://play.google.com/store/apps/details?id=com.woojulab.annyeongaga)** — V1.0.0, 2026년 9월 출시.
+**[Google Play에서 받기](https://play.google.com/store/apps/details?id=com.woojulab.annyeongaga)** — 2026년 9월 출시.
 
 | 오늘 | 기록 |
 |---|---|
