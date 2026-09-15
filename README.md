@@ -94,8 +94,8 @@ V1은 Android 전용이다. 표시 이름은 `안녕아가`, 패키지명은
 초기 이름인 `carelog`를 그대로 쓴다 — 내부 식별자라 바꿀 실익이 없다.
 EAS 프로젝트 연결은 `extra.eas.projectId`가 담당한다.
 
-V1.1 이후로 미룬 것: 통계 화면과 추이 그래프, 백업·가져오기,
-수동 다크모드, 수유 타이머, 유축, 알림, 여러 아이, 클라우드 동기화.
+추후 계획: 통계 화면과 추이 그래프, 백업·가져오기, 다크 모드,
+수유 타이머, 유축, 알림, 여러 아이, 클라우드 동기화.
 
 단계별 계획과 결정의 근거는 [docs/PLAN.md](docs/PLAN.md)에 있다.
 스토어 페이지는 [play.google.com/store/apps/details?id=com.woojulab.annyeongaga](https://play.google.com/store/apps/details?id=com.woojulab.annyeongaga).
