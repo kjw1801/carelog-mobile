@@ -21,6 +21,8 @@ import { getBaby, saveBaby } from '@/db/baby';
 import { formatCalendarDate, fromCalendarDate, toCalendarDate } from '@/lib/date';
 import { clampName } from '@/lib/name';
 import { type Colors } from '@/theme/colors';
+import { THEME_PREFERENCE_LABEL, THEME_PREFERENCES } from '@/theme/preference';
+import { useThemePreference } from '@/theme/provider';
 import { useColors } from '@/theme/useColors';
 
 /**
@@ -33,6 +35,7 @@ const PRIVACY_URL = 'https://kjw1801.github.io/carelog-mobile/privacy.html';
 export default function SettingsScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { preference, setPreference } = useThemePreference();
   const db = useSQLiteContext();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState<string | null>(null);
@@ -172,6 +175,27 @@ export default function SettingsScreen() {
           <Text style={styles.saveButtonText}>저장</Text>
         </Pressable>
 
+        {/* 아이 정보와 달리 저장 버튼이 없다. 고르는 즉시 화면이 바뀌므로 눌러
+            확인할 것이 없고, 되돌리려면 다시 고르면 된다. */}
+        <Text style={styles.label}>화면 모드</Text>
+        <View style={styles.row} accessibilityRole="radiogroup">
+          {THEME_PREFERENCES.map((value) => {
+            const selected = preference === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.themeChip, selected && styles.themeChipSelected]}
+                onPress={() => setPreference(value)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}>
+                <Text style={[styles.themeChipText, selected && styles.themeChipTextSelected]}>
+                  {THEME_PREFERENCE_LABEL[value]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.about}>
           {/* 이름을 하드코딩하면 표시 이름을 바꿀 때 이 화면만 뒤처진다.
               읽지 못했을 때의 대체 문구도 이름이 아니어야 한다. */}
@@ -244,6 +268,16 @@ function createStyles(c: Colors) {
     },
     clearButtonText: { fontSize: 15, color: c.textMuted },
     chipPlaceholder: { fontSize: 17, color: c.textPlaceholder },
+    themeChip: {
+      flex: 1,
+      paddingVertical: 16,
+      borderRadius: 10,
+      backgroundColor: c.surfaceMuted,
+      alignItems: 'center',
+    },
+    themeChipSelected: { backgroundColor: c.accent },
+    themeChipText: { fontSize: 16, color: c.text },
+    themeChipTextSelected: { color: c.onAccent, fontWeight: '700' },
     saveButton: {
       marginTop: 32,
       paddingVertical: 18,
@@ -265,8 +299,8 @@ function createStyles(c: Colors) {
       minHeight: 48,
       justifyContent: 'center',
     },
-    // 강조색 `#0a84ff`는 이 회색 배경에서 3.27:1이라 본문 대비 기준에 못 미친다.
-    // 어두운 파랑으로 5.71:1을 확보한다. 링크는 찾을 수 있어야 의미가 있다.
+    // 면에 까는 `accent`를 글자로 쓰면 본문 대비에 못 미친다. 링크는 찾을 수
+    // 있어야 의미가 있어서 `accentText`가 따로 있다.
     aboutLink: { fontSize: 14, color: c.accentText },
   });
 }
