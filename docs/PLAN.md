@@ -255,9 +255,12 @@ Metro가 필요해 이 용도에 쓸 수 없다.
 
 ### 추후 정리
 
-출시 조건은 아니고 저장소 정리다. 템플릿 에셋과 웹 의존성 —
-`react-dom`·`react-native-web`은 `expo`·`expo-router`의 peer라 되돌아오고
-`expo-file-system`은 `expo` 자체 의존성이라 지울 수 없어 실익이 작다.
+출시 조건은 아니고 저장소 정리다. 사용하지 않는 독립 패키지 `expo-image`,
+`expo-device`, `expo-web-browser`와 미참조 템플릿 이미지를 정리한다.
+`expo-router`가 요구하는 패키지는 직접 의존성에서 빼도 설치본에 남아 제거 실익이
+없으므로 제외한다. 1.2.0 심사가 끝난 뒤 별도 변경으로 진행하고 preview에서 회귀를
+확인한다.
+
 쓰지 않는 권한은 `android.blockedPermissions`로 이미 막았다.
 
 
