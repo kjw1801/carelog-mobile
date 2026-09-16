@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/annyeongaga-icon.png",
     "scheme": "annyeongaga",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/annyeongaga-icon.png"
     },
@@ -36,7 +36,11 @@
         {
           "backgroundColor": "#FEF5DF",
           "image": "./assets/images/annyeongaga-adaptive-foreground.png",
-          "imageWidth": 220
+          "imageWidth": 220,
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/annyeongaga-adaptive-foreground.png"
+          }
         }
       ],
       "expo-sqlite",

@@ -7,6 +7,8 @@ import { DIAPER_KIND_LABEL } from '@/db/diapers';
 import { BREAST_SIDE_LABEL, FEEDING_KIND_LABEL } from '@/db/feedings';
 import { listTimeline, type TimelineEntry } from '@/db/timeline';
 import { formatDay, formatDuration, formatTimeOfDay, isSameDay } from '@/lib/time';
+import { type Colors } from '@/theme/colors';
+import { useColors } from '@/theme/useColors';
 
 type Section = { title: string; data: TimelineEntry[] };
 
@@ -66,6 +68,8 @@ const FORM_PATH = {
 } as const;
 
 export default function RecordsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [rows, setRows] = useState<TimelineEntry[]>([]);
 
@@ -110,7 +114,7 @@ export default function RecordsScreen() {
               <View style={styles.body}>
                 {/* 아이콘 대신 색 점을 쓴다. 기저귀에 어울리는 아이콘이 없어
                     셋을 맞추려면 하나는 억지가 된다. 종류는 바로 옆에 있다. */}
-                <View style={DOT_STYLE[item.type]} />
+                <View style={styles.dotByType[item.type]} />
                 <Text style={styles.title}>{TITLE[item.type]}</Text>
                 {/* 값은 종류 바로 옆에 붙인다. flex로 밀어 오른쪽 끝에 두면
                     한 줄인데도 눈이 두 번 움직인다. */}
@@ -135,43 +139,46 @@ export default function RecordsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#fff' },
-  listContent: { paddingHorizontal: 20, paddingBottom: 24 },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    gap: 8,
-  },
-  emptyText: { fontSize: 16, color: '#8a8a8e' },
-  emptyHint: { fontSize: 14, color: '#b0b0b5' },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8a8a8e',
-    backgroundColor: '#fff',
-    paddingTop: 20,
-    paddingBottom: 8,
-  },
-  // 카드도 테두리도 없다. 왼쪽 시각 열과 여백만으로 줄이 갈린다.
-  row: { flexDirection: 'row', gap: 16, paddingVertical: 12 },
-  time: { fontSize: 16, fontWeight: '700', color: '#1c1c1e', width: 64 },
-  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  dotFeeding: { backgroundColor: '#0a84ff' },
-  dotDiaper: { backgroundColor: '#34a853' },
-  dotSleep: { backgroundColor: '#5b597a' },
-  title: { fontSize: 16, fontWeight: '600', color: '#1c1c1e' },
-  detail: { fontSize: 15, color: '#3a3a3c', flexShrink: 1 },
-  // `flex: 1`이라 남는 자리를 전부 가져가고, 짧아도 오른쪽 끝에 붙는다.
-  // 종류와 값이 먼저 자리를 잡은 뒤 남는 만큼만 쓰므로 그 둘을 밀어내지 않는다.
-  note: { flex: 1, textAlign: 'right', fontSize: 14, color: '#8a8a8e' },
-});
+function createStyles(c: Colors) {
+  const s = StyleSheet.create({
+    list: { flex: 1, backgroundColor: c.surface },
+    listContent: { paddingHorizontal: 20, paddingBottom: 24 },
+    empty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.surface,
+      gap: 8,
+    },
+    emptyText: { fontSize: 16, color: c.textMuted },
+    emptyHint: { fontSize: 14, color: c.textPlaceholder },
+    sectionHeader: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: c.textMuted,
+      backgroundColor: c.surface,
+      paddingTop: 20,
+      paddingBottom: 8,
+    },
+    // 카드도 테두리도 없다. 왼쪽 시각 열과 여백만으로 줄이 갈린다.
+    row: { flexDirection: 'row', gap: 16, paddingVertical: 12 },
+    time: { fontSize: 16, fontWeight: '700', color: c.text, width: 64 },
+    body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    dot: { width: 10, height: 10, borderRadius: 5 },
+    dotFeeding: { backgroundColor: c.accent },
+    dotDiaper: { backgroundColor: c.diaper },
+    dotSleep: { backgroundColor: c.sleepDot },
+    title: { fontSize: 16, fontWeight: '600', color: c.text },
+    detail: { fontSize: 15, color: c.textLabel, flexShrink: 1 },
+    // `flex: 1`이라 남는 자리를 전부 가져가고, 짧아도 오른쪽 끝에 붙는다.
+    // 종류와 값이 먼저 자리를 잡은 뒤 남는 만큼만 쓰므로 그 둘을 밀어내지 않는다.
+    note: { flex: 1, textAlign: 'right', fontSize: 14, color: c.textMuted },
+  });
 
-const DOT_STYLE: Record<TimelineEntry['type'], object> = {
-  feeding: StyleSheet.flatten([styles.dot, styles.dotFeeding]),
-  diaper: StyleSheet.flatten([styles.dot, styles.dotDiaper]),
-  sleep: StyleSheet.flatten([styles.dot, styles.dotSleep]),
-};
+  const dot: Record<TimelineEntry['type'], object> = {
+    feeding: StyleSheet.flatten([s.dot, s.dotFeeding]),
+    diaper: StyleSheet.flatten([s.dot, s.dotDiaper]),
+    sleep: StyleSheet.flatten([s.dot, s.dotSleep]),
+  };
+  return { ...s, dotByType: dot };
+}

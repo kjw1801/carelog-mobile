@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import Constants from 'expo-constants';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -20,6 +20,8 @@ import {
 import { getBaby, saveBaby } from '@/db/baby';
 import { formatCalendarDate, fromCalendarDate, toCalendarDate } from '@/lib/date';
 import { clampName } from '@/lib/name';
+import { type Colors } from '@/theme/colors';
+import { useColors } from '@/theme/useColors';
 
 /**
  * Play는 처리방침 링크를 콘솔과 **앱 안** 양쪽에 요구한다. 콘솔에만 넣으면 요건을
@@ -29,6 +31,8 @@ import { clampName } from '@/lib/name';
 const PRIVACY_URL = 'https://kjw1801.github.io/carelog-mobile/privacy.html';
 
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState<string | null>(null);
@@ -108,9 +112,7 @@ export default function SettingsScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>아이 이름</Text>
         <TextInput
           style={styles.input}
@@ -119,7 +121,7 @@ export default function SettingsScreen() {
           // 헤더에 들어갈 폭으로 잘라야 `D+n`이 밀려나지 않는다.
           onChangeText={(text) => setName(clampName(text))}
           placeholder="예: 정우"
-          placeholderTextColor="#b0b0b5"
+          placeholderTextColor={colors.textPlaceholder}
           returnKeyType="done"
           editable={loaded && !saving}
           accessibilityLabel="아이 이름"
@@ -156,8 +158,8 @@ export default function SettingsScreen() {
 
         {loadFailed ? (
           <Text style={styles.error}>
-            설정을 불러오지 못했습니다. 앱을 다시 열어 주세요. 지금 저장하면 기존
-            설정이 지워질 수 있어 저장을 막아 두었습니다.
+            설정을 불러오지 못했습니다. 앱을 다시 열어 주세요. 지금 저장하면 기존 설정이 지워질 수
+            있어 저장을 막아 두었습니다.
           </Text>
         ) : null}
 
@@ -173,9 +175,7 @@ export default function SettingsScreen() {
         <View style={styles.about}>
           {/* 이름을 하드코딩하면 표시 이름을 바꿀 때 이 화면만 뒤처진다.
               읽지 못했을 때의 대체 문구도 이름이 아니어야 한다. */}
-          <Text style={styles.aboutTitle}>
-            {Constants.expoConfig?.name ?? '앱 정보'}
-          </Text>
+          <Text style={styles.aboutTitle}>{Constants.expoConfig?.name ?? '앱 정보'}</Text>
           <Text style={styles.aboutLine}>버전 {Constants.expoConfig?.version ?? '-'}</Text>
           {/* 자동 백업을 허용하므로 `기기에만 저장됩니다`라고 안내하지 않는다. */}
           <Text style={styles.aboutLine}>로그인 없이 사용할 수 있습니다.</Text>
@@ -202,60 +202,71 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f7' },
-  // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
-  // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
-  content: { padding: 20, paddingBottom: 120, gap: 8 },
-  label: { fontSize: 14, fontWeight: '600', color: '#3a3a3c', marginTop: 16 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e0e0e5',
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    fontSize: 17,
-    color: '#1c1c1e',
-  },
-  row: { flexDirection: 'row', gap: 8 },
-  chip: {
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e5',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  chipFlex: { flex: 1 },
-  chipText: { fontSize: 17, color: '#1c1c1e' },
-  clearButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#f0f0f3',
-    justifyContent: 'center',
-  },
-  clearButtonText: { fontSize: 15, color: '#8a8a8e' },
-  chipPlaceholder: { fontSize: 17, color: '#b0b0b5' },
-  saveButton: {
-    marginTop: 32,
-    paddingVertical: 18,
-    borderRadius: 12,
-    backgroundColor: '#0a84ff',
-    alignItems: 'center',
-  },
-  saveButtonDisabled: { backgroundColor: '#b0c9e5' },
-  saveButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  error: { marginTop: 24, fontSize: 14, color: '#ff3b30', lineHeight: 20 },
-  about: { marginTop: 40, gap: 4 },
-  aboutTitle: { fontSize: 15, fontWeight: '600', color: '#3a3a3c' },
-  aboutLine: { fontSize: 14, color: '#8a8a8e' },
-  // 글자 높이만으로는 터치 영역이 20dp도 되지 않는다. Material의 최소 터치 크기가
-  // 48dp라 높이를 그만큼 준다. `alignSelf`가 없으면 가로로 늘어나 옆의 빈 곳을
-  // 눌러도 브라우저가 열린다.
-  aboutLinkButton: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center' },
-  // 강조색 `#0a84ff`는 이 회색 배경에서 3.27:1이라 본문 대비 기준에 못 미친다.
-  // 어두운 파랑으로 5.71:1을 확보한다. 링크는 찾을 수 있어야 의미가 있다.
-  aboutLink: { fontSize: 14, color: '#0a5cbf' },
-});
+function createStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background },
+    // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
+    // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
+    content: { padding: 20, paddingBottom: 120, gap: 8 },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: c.textLabel,
+      marginTop: 16,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      fontSize: 17,
+      color: c.text,
+    },
+    row: { flexDirection: 'row', gap: 8 },
+    chip: {
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    chipFlex: { flex: 1 },
+    chipText: { fontSize: 17, color: c.text },
+    clearButton: {
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      backgroundColor: c.surfaceMuted,
+      justifyContent: 'center',
+    },
+    clearButtonText: { fontSize: 15, color: c.textMuted },
+    chipPlaceholder: { fontSize: 17, color: c.textPlaceholder },
+    saveButton: {
+      marginTop: 32,
+      paddingVertical: 18,
+      borderRadius: 12,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+    },
+    saveButtonDisabled: { backgroundColor: c.accentDisabled },
+    saveButtonText: { fontSize: 17, fontWeight: '700', color: c.onAccent },
+    error: { marginTop: 24, fontSize: 14, color: c.danger, lineHeight: 20 },
+    about: { marginTop: 40, gap: 4 },
+    aboutTitle: { fontSize: 15, fontWeight: '600', color: c.textLabel },
+    aboutLine: { fontSize: 14, color: c.textMuted },
+    // 글자 높이만으로는 터치 영역이 20dp도 되지 않는다. Material의 최소 터치 크기가
+    // 48dp라 높이를 그만큼 준다. `alignSelf`가 없으면 가로로 늘어나 옆의 빈 곳을
+    // 눌러도 브라우저가 열린다.
+    aboutLinkButton: {
+      alignSelf: 'flex-start',
+      minHeight: 48,
+      justifyContent: 'center',
+    },
+    // 강조색 `#0a84ff`는 이 회색 배경에서 3.27:1이라 본문 대비 기준에 못 미친다.
+    // 어두운 파랑으로 5.71:1을 확보한다. 링크는 찾을 수 있어야 의미가 있다.
+    aboutLink: { fontSize: 14, color: c.accentText },
+  });
+}

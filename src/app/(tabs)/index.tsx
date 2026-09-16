@@ -4,25 +4,12 @@ import { Tabs } from 'expo-router/js-tabs';
 import { HeaderTitle, type HeaderTitleProps } from 'expo-router/react-navigation';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  AppState,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBaby, type Baby } from '@/db/baby';
 import { getTodayDiaperCount } from '@/db/diapers';
-import {
-  getLastFeeding,
-  getTodaySummary,
-  type Feeding,
-  type TodaySummary,
-} from '@/db/feedings';
+import { getLastFeeding, getTodaySummary, type Feeding, type TodaySummary } from '@/db/feedings';
 import {
   endSleep,
   getActiveSleep,
@@ -33,6 +20,8 @@ import {
 import { daysSinceBirth } from '@/lib/date';
 import { clampName } from '@/lib/name';
 import { calculateSleepDuration } from '@/lib/sleep';
+import { type Colors } from '@/theme/colors';
+import { useColors } from '@/theme/useColors';
 import {
   formatDuration,
   formatDurationCompact,
@@ -44,9 +33,14 @@ import {
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
 export default function TodayScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [last, setLast] = useState<Feeding | null>(null);
-  const [summary, setSummary] = useState<TodaySummary>({ count: 0, formulaMl: null });
+  const [summary, setSummary] = useState<TodaySummary>({
+    count: 0,
+    formulaMl: null,
+  });
   const [diaperCount, setDiaperCount] = useState(0);
   const [todaySleeps, setTodaySleeps] = useState<Sleep[]>([]);
   const [baby, setBaby] = useState<Baby | null>(null);
@@ -70,13 +64,7 @@ export default function TodayScreen() {
   // useMemo를 빼면 React Compiler가 이 컴포넌트의 최적화를 포기한다
   // (ESLint react-hooks/preserve-manual-memoization). 지우지 말 것.
   const sleepMs = useMemo(
-    () =>
-      calculateSleepDuration(
-        todaySleeps,
-        dayStart,
-        todayRange(new Date(dayStart)).end,
-        now
-      ),
+    () => calculateSleepDuration(todaySleeps, dayStart, todayRange(new Date(dayStart)).end, now),
     [todaySleeps, dayStart, now]
   );
 
@@ -206,12 +194,7 @@ export default function TodayScreen() {
   // 라벨을 붙이면 자식 Text가 낭독에서 빠진다. 12시간 초과는 화면에서 색으로만
   // 알리므로 낭독에는 말로 넣는다 — 색은 읽히지 않는다.
   const sleepAccessibilityLabel = activeSleep
-    ? [
-        '수면 중',
-        elapsedSleep,
-        sleepOverdue ? '12시간 초과' : null,
-        '탭하여 수면 종료 확인',
-      ]
+    ? ['수면 중', elapsedSleep, sleepOverdue ? '12시간 초과' : null, '탭하여 수면 종료 확인']
         .filter(Boolean)
         .join(', ')
     : '수면 시작';
@@ -257,10 +240,7 @@ export default function TodayScreen() {
           accessible
           accessibilityRole="header"
           accessibilityLabel={`${fullBabyName}의 오늘${suffix}`}>
-          <HeaderTitle
-            {...titleProps}
-            numberOfLines={1}
-            style={[style, styles.headerName]}>
+          <HeaderTitle {...titleProps} numberOfLines={1} style={[style, styles.headerName]}>
             {displayBabyName}
           </HeaderTitle>
           <HeaderTitle {...titleProps} style={[style, styles.headerSuffix]}>
@@ -271,7 +251,7 @@ export default function TodayScreen() {
     };
     // **원본도 의존성이다.** 앞부분이 같고 뒤만 바뀌면 표시 문자열은 그대로라
     // 여기서 빠뜨리면 화면은 맞는데 낭독만 옛 이름으로 남는다.
-  }, [fullBabyName, displayBabyName, dayCount]);
+  }, [fullBabyName, displayBabyName, dayCount, styles]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -282,7 +262,9 @@ export default function TodayScreen() {
           <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
             <>
-              <Text style={styles.cardValue} numberOfLines={1}>{formatElapsed(last.occurred_at, now)}</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {formatElapsed(last.occurred_at, now)}
+              </Text>
               <Text style={styles.cardSub}>{formatTimeOfDay(last.occurred_at)}</Text>
             </>
           ) : (
@@ -291,36 +273,44 @@ export default function TodayScreen() {
         </View>
 
         <View style={styles.cardRow}>
-          <View style={cardHalfStyle}>
+          <View style={styles.cardHalfFlat}>
             <Text style={styles.cardLabel}>오늘 수유</Text>
-            <Text style={styles.cardValue} numberOfLines={1}>{summary.count}회</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {summary.count}회
+            </Text>
           </View>
-          <View style={cardHalfStyle}>
+          <View style={styles.cardHalfFlat}>
             <Text style={styles.cardLabel}>오늘 기저귀</Text>
-            <Text style={styles.cardValue} numberOfLines={1}>{diaperCount}회</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {diaperCount}회
+            </Text>
           </View>
         </View>
 
         <View style={styles.cardRow}>
           {/* 겹치는 수면이 하나도 없으면 0시간이 아니라 "기록 없음"이다.
               안 잔 것과 기록하지 않은 것은 다르다. */}
-          <View style={cardHalfStyle}>
+          <View style={styles.cardHalfFlat}>
             <Text style={styles.cardLabel}>오늘 수면</Text>
             {todaySleeps.length === 0 ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue} numberOfLines={1}>{formatDurationCompact(sleepMs)}</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {formatDurationCompact(sleepMs)}
+              </Text>
             )}
           </View>
           {/* 분유만 더한다. 모유는 양이 없고, 종류를 물어보기 전에 적힌 양은
               분유였는지 알 수 없다. 한 번도 입력하지 않았다면 0ml이 아니라
               "기록 없음"이다. */}
-          <View style={cardHalfStyle}>
+          <View style={styles.cardHalfFlat}>
             <Text style={styles.cardLabel}>오늘 분유량</Text>
             {summary.formulaMl === null ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue} numberOfLines={1}>{summary.formulaMl}ml</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {summary.formulaMl}ml
+              </Text>
             )}
           </View>
         </View>
@@ -328,19 +318,19 @@ export default function TodayScreen() {
 
       <View style={styles.buttons}>
         <Link href="/feeding-form" asChild>
-          <Pressable style={feedingButtonStyle} accessibilityRole="button">
+          <Pressable style={styles.feedingButtonFlat} accessibilityRole="button">
             <Text style={styles.addButtonText}>수유 기록</Text>
           </Pressable>
         </Link>
         <Link href="/diaper-form" asChild>
-          <Pressable style={diaperButtonStyle} accessibilityRole="button">
+          <Pressable style={styles.diaperButtonFlat} accessibilityRole="button">
             <Text style={styles.addButtonText}>기저귀 기록</Text>
           </Pressable>
         </Link>
       </View>
 
       <Pressable
-        style={sleepButtonStyle(activeSleep !== null, sleepOverdue)}
+        style={sleepButtonStyle(styles, activeSleep !== null, sleepOverdue)}
         onPress={onPressSleep}
         disabled={toggling}
         accessibilityRole="button"
@@ -348,7 +338,11 @@ export default function TodayScreen() {
         accessibilityLabel={sleepAccessibilityLabel}>
         <View style={styles.sleepMain}>
           {/* 낮잠·밤잠을 구분하지 않는 수면 기록이므로 침대 아이콘을 쓴다. */}
-          <Ionicons name="bed" size={18} color={activeSleep ? '#fff' : '#c7c6d4'} />
+          <Ionicons
+            name="bed"
+            size={18}
+            color={activeSleep ? colors.onAccent : colors.sleepIconIdle}
+          />
           <Text style={styles.addButtonText}>
             {activeSleep ? `수면 중 · ${elapsedSleep}` : '수면 시작'}
           </Text>
@@ -358,97 +352,94 @@ export default function TodayScreen() {
             시작 시각은 기록 탭에 있고, 12시간 초과는 버튼 배경색으로 알린다. */}
         {activeSleep ? <Text style={styles.sleepEnd}>수면 종료</Text> : null}
       </Pressable>
-
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f7', padding: 20, gap: 12 },
-  // 이름만 줄어들게 하는 두 조각 제목. 컨테이너가 `flexShrink: 1`이라 헤더가
-  // 주는 폭 안에서 줄어들고, 그 줄어듦을 이름 쪽이 전부 받는다.
-  headerTitle: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  headerName: { flexShrink: 1 },
-  headerSuffix: { flexShrink: 0 },
-  // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
-  cards: { flex: 1 },
-  // 끝까지 내렸을 때 마지막 카드가 경계에 붙지 않도록 여백을 준다.
-  cardsContent: { gap: 12, paddingBottom: 12 },
-  cardRow: { flexDirection: 'row', gap: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 4 },
-  cardHalf: { flex: 1 },
-  cardLabel: { fontSize: 14, color: '#8a8a8e' },
-  cardValue: { fontSize: 32, fontWeight: '700', color: '#1c1c1e' },
-  cardSub: { fontSize: 15, color: '#8a8a8e' },
-  cardEmpty: { fontSize: 20, color: '#b0b0b5', paddingVertical: 6 },
-  buttons: { flexDirection: 'row', gap: 12 },
-  // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
-  // 전부 먹어 다른 카드를 덮는다.
-  addButton: {
-    backgroundColor: '#0a84ff',
-    borderRadius: 14,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  inRow: { flex: 1 },
-  diaperButton: { backgroundColor: '#34a853' },
-  // 버튼 전체 색이 바뀌어야 상태가 바뀐 것으로 읽힌다. 아이콘과 글자만
-  // 바꾸면 눌렀는지 아닌지 알기 어렵다.
-  //
-  // 밝은 주황(#ff9500)은 어두운 환경에서 지나치게 밝고, 흰 글자 대비가
-  // 2.2:1로 큰 글자 기준(3:1)에도 못 미쳤다. 차분한 톤으로 낮춰 대비를 얻는다 —
-  // #b85c00은 4.60:1, #9f3a20은 6.77:1이다.
-  //
-  // 12시간을 넘기면 한 단계 더 진한 색으로 간다. 주황 위에 노란 글씨를 얹으면
-  // 대비가 나빠 안내가 묻힌다.
-  sleepStartButton: { backgroundColor: '#3f3d56' },
-  sleepActiveButton: { backgroundColor: '#b85c00' },
-  sleepOverdueButton: { backgroundColor: '#9f3a20' },
-  // 수면 컨트롤은 위 두 버튼과 같은 addButton을 쓴다. 한 줄에 같은 글자 크기라
-  // 높이가 따로 지정하지 않아도 같아진다. 숫자로 박으면 글자 크기를 키운
-  // 기기에서 어긋난다.
-  // flexDirection이 row가 되면 alignItems는 세로만 맡는다. 가로 가운데는
-  // justifyContent가 한다. 진행 중 상태는 아래 space-between이 덮어쓴다.
-  sleepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  sleepRowActive: { justifyContent: 'space-between', paddingHorizontal: 20 },
-  sleepMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sleepEnd: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  addButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-});
+function createStyles(c: Colors) {
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.background, padding: 20, gap: 12 },
+    // 이름만 줄어들게 하는 두 조각 제목. 컨테이너가 `flexShrink: 1`이라 헤더가
+    // 주는 폭 안에서 줄어들고, 그 줄어듦을 이름 쪽이 전부 받는다.
+    headerTitle: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+    headerName: { flexShrink: 1 },
+    headerSuffix: { flexShrink: 0 },
+    // 카드는 스크롤한다. 고정 높이 컬럼은 항목이 늘면 버튼 뒤로 잘린다.
+    cards: { flex: 1 },
+    // 끝까지 내렸을 때 마지막 카드가 경계에 붙지 않도록 여백을 준다.
+    cardsContent: { gap: 12, paddingBottom: 12 },
+    cardRow: { flexDirection: 'row', gap: 12 },
+    card: { backgroundColor: c.surface, borderRadius: 14, padding: 16, gap: 4 },
+    cardHalf: { flex: 1 },
+    cardLabel: { fontSize: 14, color: c.textMuted },
+    cardValue: { fontSize: 32, fontWeight: '700', color: c.text },
+    cardSub: { fontSize: 15, color: c.textMuted },
+    cardEmpty: { fontSize: 20, color: c.textPlaceholder, paddingVertical: 6 },
+    buttons: { flexDirection: 'row', gap: 12 },
+    // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
+    // 전부 먹어 다른 카드를 덮는다.
+    addButton: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 20,
+      alignItems: 'center',
+    },
+    inRow: { flex: 1 },
+    diaperButton: { backgroundColor: c.diaper },
+    // 버튼 전체 색이 바뀌어야 상태가 바뀐 것으로 읽힌다. 아이콘과 글자만
+    // 바꾸면 눌렀는지 아닌지 알기 어렵다.
+    //
+    // 밝은 주황은 어두운 환경에서 지나치게 밝고 흰 글자 대비도 모자랐다.
+    // 차분한 톤으로 낮춰 대비를 얻었고, 수치는 `theme/colors.test.ts`가 지킨다.
+    //
+    // 12시간을 넘기면 한 단계 더 진한 색으로 간다. 주황 위에 노란 글씨를 얹으면
+    // 대비가 나빠 안내가 묻힌다.
+    sleepStartButton: { backgroundColor: c.sleepIdle },
+    sleepActiveButton: { backgroundColor: c.sleepActive },
+    sleepOverdueButton: { backgroundColor: c.sleepOverdue },
+    // 수면 컨트롤은 위 두 버튼과 같은 addButton을 쓴다. 한 줄에 같은 글자 크기라
+    // 높이가 따로 지정하지 않아도 같아진다. 숫자로 박으면 글자 크기를 키운
+    // 기기에서 어긋난다.
+    // flexDirection이 row가 되면 alignItems는 세로만 맡는다. 가로 가운데는
+    // justifyContent가 한다. 진행 중 상태는 아래 space-between이 덮어쓴다.
+    sleepRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    sleepRowActive: { justifyContent: 'space-between', paddingHorizontal: 20 },
+    sleepMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    sleepEnd: { fontSize: 15, fontWeight: '700', color: c.onAccent },
+    addButtonText: { fontSize: 17, fontWeight: '700', color: c.onAccent },
+  });
 
-// <Link asChild>는 자식에게 스타일 배열을 넘기면 expo-router가 throw한다.
-// 한 번만 합쳐서 단일 객체로 전달한다.
-const feedingButtonStyle = StyleSheet.flatten([styles.addButton, styles.inRow]);
-const diaperButtonStyle = StyleSheet.flatten([
-  styles.addButton,
-  styles.inRow,
-  styles.diaperButton,
-]);
-const sleepStartButtonStyle = StyleSheet.flatten([
-  styles.addButton,
-  styles.sleepStartButton,
-  styles.sleepRow,
-]);
-const sleepActiveStyle = StyleSheet.flatten([
-  styles.addButton,
-  styles.sleepActiveButton,
-  styles.sleepRow,
-  styles.sleepRowActive,
-]);
-const sleepOverdueStyle = StyleSheet.flatten([
-  styles.addButton,
-  styles.sleepOverdueButton,
-  styles.sleepRow,
-  styles.sleepRowActive,
-]);
-
-function sleepButtonStyle(active: boolean, overdue: boolean) {
-  if (!active) return sleepStartButtonStyle;
-  return overdue ? sleepOverdueStyle : sleepActiveStyle;
+  // <Link asChild>는 자식에게 스타일 배열을 넘기면 expo-router가 throw한다.
+  // 한 번만 합쳐서 단일 객체로 전달한다.
+  return {
+    ...s,
+    feedingButtonFlat: StyleSheet.flatten([s.addButton, s.inRow]),
+    diaperButtonFlat: StyleSheet.flatten([s.addButton, s.inRow, s.diaperButton]),
+    sleepStartFlat: StyleSheet.flatten([s.addButton, s.sleepStartButton, s.sleepRow]),
+    sleepActiveFlat: StyleSheet.flatten([
+      s.addButton,
+      s.sleepActiveButton,
+      s.sleepRow,
+      s.sleepRowActive,
+    ]),
+    sleepOverdueFlat: StyleSheet.flatten([
+      s.addButton,
+      s.sleepOverdueButton,
+      s.sleepRow,
+      s.sleepRowActive,
+    ]),
+    cardHalfFlat: StyleSheet.flatten([s.card, s.cardHalf]),
+  };
 }
-const cardHalfStyle = StyleSheet.flatten([styles.card, styles.cardHalf]);
+
+type Styles = ReturnType<typeof createStyles>;
+
+function sleepButtonStyle(styles: Styles, active: boolean, overdue: boolean) {
+  if (!active) return styles.sleepStartFlat;
+  return overdue ? styles.sleepOverdueFlat : styles.sleepActiveFlat;
+}

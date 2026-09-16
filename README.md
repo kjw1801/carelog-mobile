@@ -62,8 +62,8 @@ React Native 0.86 / Expo SDK 57 / TypeScript / Expo Router / expo-sqlite
 
 ## 테스트와 검증
 
-- 순수 로직에 대한 단위 테스트 57개 (jest / jest-expo) — 날짜 경계, 수면 구간
-  병합, 수유량 파싱, 시간 포맷, 일령 계산, 이름 길이 제한
+- 순수 로직에 대한 단위 테스트 127개 (jest / jest-expo) — 날짜 경계, 수면 구간
+  병합, 수유량 파싱, 시간 포맷, 일령 계산, 이름 길이 제한, 색상 대비
 - 서머타임 전환일 검증은 `npm run test:dst`가 `TZ=America/New_York`로 따로 돌린다.
   한국은 서머타임이 없어 KST로는 아무것도 증명하지 못한다
 - TypeScript strict, ESLint(React Compiler 규칙 포함)
@@ -94,8 +94,9 @@ V1은 Android 전용이다. 표시 이름은 `안녕아가`, 패키지명은
 초기 이름인 `carelog`를 그대로 쓴다 — 내부 식별자라 바꿀 실익이 없다.
 EAS 프로젝트 연결은 `extra.eas.projectId`가 담당한다.
 
-추후 계획: 통계 화면과 추이 그래프, 백업·가져오기, 다크 모드,
-수유 타이머, 유축, 알림, 여러 아이, 클라우드 동기화.
+추후 계획: 통계 화면과 추이 그래프, 백업·가져오기,
+다크 모드 수동 선택(시스템·밝게·어둡게), 수유 타이머, 유축, 알림,
+여러 아이, 클라우드 동기화.
 
 단계별 계획과 결정의 근거는 [docs/PLAN.md](docs/PLAN.md)에 있다.
 스토어 페이지는 [play.google.com/store/apps/details?id=com.woojulab.annyeongaga](https://play.google.com/store/apps/details?id=com.woojulab.annyeongaga).

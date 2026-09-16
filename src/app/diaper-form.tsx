@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -24,10 +24,14 @@ import {
   type DiaperKind,
 } from '@/db/diapers';
 import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
+import { type Colors } from '@/theme/colors';
+import { useColors } from '@/theme/useColors';
 
 const KINDS: DiaperKind[] = ['pee', 'poo', 'both'];
 
 export default function DiaperFormScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const diaperId = id ? Number(id) : null;
@@ -115,153 +119,160 @@ export default function DiaperFormScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: isEditing ? '기저귀 기록 수정' : '기저귀 기록' }} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled">
+        <Stack.Screen options={{ title: isEditing ? '기저귀 기록 수정' : '기저귀 기록' }} />
 
-      <Text style={styles.label}>교체 시각</Text>
-      <View style={styles.row}>
+        <Text style={styles.label}>교체 시각</Text>
+        <View style={styles.row}>
+          <Pressable
+            style={styles.chip}
+            onPress={() => setPicker('date')}
+            accessibilityRole="button"
+            accessibilityLabel={`날짜 ${formatDay(occurredAt)}, 변경`}>
+            <Text style={styles.chipText}>{formatDay(occurredAt)}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.chip}
+            onPress={() => setPicker('time')}
+            accessibilityRole="button"
+            accessibilityLabel={`시각 ${formatTimeOfDay(occurredAt)}, 변경`}>
+            <Text style={styles.chipText}>{formatTimeOfDay(occurredAt)}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.nowChip}
+            onPress={() => setOccurredAt(Date.now())}
+            accessibilityRole="button"
+            accessibilityLabel="지금 시각으로 설정">
+            <Text style={styles.nowChipText}>지금</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.label}>종류</Text>
+        <View style={styles.row}>
+          {KINDS.map((value) => {
+            const selected = kind === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.kindChip, selected && styles.kindChipSelected]}
+                onPress={() => setKind(value)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}>
+                <Text style={[styles.kindText, selected && styles.kindTextSelected]}>
+                  {DIAPER_KIND_LABEL[value]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>메모 (선택)</Text>
+        <TextInput
+          style={styles.noteInput}
+          value={noteText}
+          onChangeText={setNoteText}
+          placeholder="예: 발진 있음"
+          placeholderTextColor={colors.textPlaceholder}
+          multiline
+          accessibilityLabel="메모, 선택 입력"
+        />
+
         <Pressable
-          style={styles.chip}
-          onPress={() => setPicker('date')}
-          accessibilityRole="button"
-          accessibilityLabel={`날짜 ${formatDay(occurredAt)}, 변경`}>
-          <Text style={styles.chipText}>{formatDay(occurredAt)}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.chip}
-          onPress={() => setPicker('time')}
-          accessibilityRole="button"
-          accessibilityLabel={`시각 ${formatTimeOfDay(occurredAt)}, 변경`}>
-          <Text style={styles.chipText}>{formatTimeOfDay(occurredAt)}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.nowChip}
-          onPress={() => setOccurredAt(Date.now())}
-          accessibilityRole="button"
-          accessibilityLabel="지금 시각으로 설정">
-          <Text style={styles.nowChipText}>지금</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.label}>종류</Text>
-      <View style={styles.row}>
-        {KINDS.map((value) => {
-          const selected = kind === value;
-          return (
-            <Pressable
-              key={value}
-              style={[styles.kindChip, selected && styles.kindChipSelected]}
-              onPress={() => setKind(value)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}>
-              <Text style={[styles.kindText, selected && styles.kindTextSelected]}>
-                {DIAPER_KIND_LABEL[value]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={styles.label}>메모 (선택)</Text>
-      <TextInput
-        style={styles.noteInput}
-        value={noteText}
-        onChangeText={setNoteText}
-        placeholder="예: 발진 있음"
-        placeholderTextColor="#b0b0b5"
-        multiline
-        accessibilityLabel="메모, 선택 입력"
-      />
-
-      <Pressable
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        onPress={onSave}
-        disabled={saving}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: saving }}>
-        <Text style={styles.saveButtonText}>{isEditing ? '수정' : '저장'}</Text>
-      </Pressable>
-
-      {isEditing ? (
-        <Pressable
-          style={styles.deleteButton}
-          onPress={onDelete}
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onPress={onSave}
           disabled={saving}
           accessibilityRole="button"
           accessibilityState={{ disabled: saving }}>
-          <Text style={styles.deleteButtonText}>삭제</Text>
+          <Text style={styles.saveButtonText}>{isEditing ? '수정' : '저장'}</Text>
         </Pressable>
-      ) : null}
 
-      {picker ? (
-        <DateTimePicker
-          value={new Date(occurredAt)}
-          mode={picker}
-          is24Hour
-          maximumDate={picker === 'date' ? new Date() : undefined}
-          onValueChange={onPickerChange}
-          onDismiss={() => setPicker(null)}
-        />
-      ) : null}
-    </ScrollView>
+        {isEditing ? (
+          <Pressable
+            style={styles.deleteButton}
+            onPress={onDelete}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: saving }}>
+            <Text style={styles.deleteButtonText}>삭제</Text>
+          </Pressable>
+        ) : null}
+
+        {picker ? (
+          <DateTimePicker
+            value={new Date(occurredAt)}
+            mode={picker}
+            is24Hour
+            maximumDate={picker === 'date' ? new Date() : undefined}
+            onValueChange={onPickerChange}
+            onDismiss={() => setPicker(null)}
+          />
+        ) : null}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
-  // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
-  content: { padding: 20, paddingBottom: 120, gap: 8 },
-  label: { fontSize: 14, fontWeight: '600', color: '#3a3a3c', marginTop: 16 },
-  row: { flexDirection: 'row', gap: 8 },
-  chip: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: '#f0f0f3',
-  },
-  chipText: { fontSize: 17, color: '#1c1c1e' },
-  nowChip: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: '#e5f0ff',
-  },
-  nowChipText: { fontSize: 17, color: '#0a84ff', fontWeight: '600' },
-  kindChip: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 10,
-    backgroundColor: '#f0f0f3',
-    alignItems: 'center',
-  },
-  kindChipSelected: { backgroundColor: '#0a84ff' },
-  kindText: { fontSize: 16, color: '#1c1c1e' },
-  kindTextSelected: { color: '#fff', fontWeight: '700' },
-  noteInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e5',
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    fontSize: 17,
-    color: '#1c1c1e',
-    minHeight: 88,
-    textAlignVertical: 'top',
-  },
-  saveButton: {
-    marginTop: 32,
-    paddingVertical: 18,
-    borderRadius: 12,
-    backgroundColor: '#0a84ff',
-    alignItems: 'center',
-  },
-  saveButtonDisabled: { backgroundColor: '#b0c9e5' },
-  saveButtonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  deleteButton: { marginTop: 8, paddingVertical: 18, alignItems: 'center' },
-  deleteButtonText: { fontSize: 17, color: '#ff3b30' },
-});
+function createStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.surface },
+    // 검증 기기에서 behavior="padding"만으로는 마지막 버튼의 스크롤 여유가
+    // 부족했다. 키보드를 띄운 채 끝까지 내려도 버튼에 닿도록 여백을 둔다.
+    content: { padding: 20, paddingBottom: 120, gap: 8 },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: c.textLabel,
+      marginTop: 16,
+    },
+    row: { flexDirection: 'row', gap: 8 },
+    chip: {
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      borderRadius: 10,
+      backgroundColor: c.surfaceMuted,
+    },
+    chipText: { fontSize: 17, color: c.text },
+    nowChip: {
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      borderRadius: 10,
+      backgroundColor: c.surfaceAccent,
+    },
+    nowChipText: { fontSize: 17, color: c.accentText, fontWeight: '600' },
+    kindChip: {
+      flex: 1,
+      paddingVertical: 16,
+      borderRadius: 10,
+      backgroundColor: c.surfaceMuted,
+      alignItems: 'center',
+    },
+    kindChipSelected: { backgroundColor: c.accent },
+    kindText: { fontSize: 16, color: c.text },
+    kindTextSelected: { color: c.onAccent, fontWeight: '700' },
+    noteInput: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 10,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      fontSize: 17,
+      color: c.text,
+      minHeight: 88,
+      textAlignVertical: 'top',
+    },
+    saveButton: {
+      marginTop: 32,
+      paddingVertical: 18,
+      borderRadius: 12,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+    },
+    saveButtonDisabled: { backgroundColor: c.accentDisabled },
+    saveButtonText: { fontSize: 17, fontWeight: '700', color: c.onAccent },
+    deleteButton: { marginTop: 8, paddingVertical: 18, alignItems: 'center' },
+    deleteButtonText: { fontSize: 17, color: c.danger },
+  });
+}
