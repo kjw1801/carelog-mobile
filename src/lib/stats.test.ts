@@ -5,8 +5,7 @@ describe('toBars', () => {
     expect(toBars([2, 4, 8]).map((b) => b.ratio)).toEqual([0.25, 0.5, 1]);
   });
 
-  it('지표마다 따로 부르므로 단위가 섞이지 않는다', () => {
-    // 횟수 8회와 수면 8시간이 같은 최댓값을 쓰면 큰 쪽만 보이는 그래프가 된다.
+  it('모든 값에 같은 배율을 곱해도 막대 비율은 같다', () => {
     const counts = toBars([2, 8]);
     const sleepMs = toBars([2 * 3_600_000, 8 * 3_600_000]);
     expect(counts.map((b) => b.ratio)).toEqual(sleepMs.map((b) => b.ratio));
@@ -34,6 +33,13 @@ describe('toBars', () => {
     expect(zero.ratio).toBe(missing.ratio);
     expect(zero.value).toBe(0);
     expect(missing.value).toBeNull();
+  });
+
+  it('NaN이나 Infinity가 섞여도 나머지 막대가 멀쩡하다', () => {
+    // 한쪽만 막으면 그 값 자신의 비율이 새어 나간다. 최댓값 계산과 비율 계산
+    // 양쪽에서 걸러야 `ratio`가 0~1 안에 남는다.
+    expect(toBars([NaN, 5]).map((b) => b.ratio)).toEqual([0, 1]);
+    expect(toBars([Infinity, 5]).map((b) => b.ratio)).toEqual([0, 1]);
   });
 
   it('음수가 섞여도 비율이 0 미만으로 내려가지 않는다', () => {

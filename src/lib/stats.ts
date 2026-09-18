@@ -20,6 +20,9 @@ export type Bar = {
   value: DayValue;
 };
 
+const isFiniteValue = (value: DayValue): value is number =>
+  value !== null && Number.isFinite(value);
+
 /**
  * 한 지표의 하루치 값들을 막대로 바꾼다.
  *
@@ -28,14 +31,18 @@ export type Bar = {
  *
  * 최댓값이 `0`이면(모두 0이거나 모두 기록 없음) 나누지 않고 높이를 0으로 둔다.
  *
- * 비율은 음수가 되지 않는다. 횟수·수유량·수면은 모두 0 이상이라 음수가 들어올
- * 일이 없지만, 들어오더라도 막대가 축 아래로 뻗는 대신 0으로 눕는다.
+ * **`ratio`는 어떤 입력에도 0~1 안에 있다.** 음수는 0으로 눕히고, `NaN`·`Infinity`는
+ * 최댓값 계산과 비율 계산 **양쪽에서** 거른다. 한쪽만 막으면 그 값 자신의 비율이
+ * `NaN`이나 `Infinity`로 새어 나가고, 막대 높이로 쓰이므로 레이아웃이 깨진다.
  */
 export function toBars(values: DayValue[]): Bar[] {
-  const max = values.reduce<number>((m, v) => (v === null ? m : Math.max(m, v)), 0);
+  const max = values.reduce<number>(
+    (current, value) => (isFiniteValue(value) ? Math.max(current, value) : current),
+    0
+  );
   return values.map((value) => ({
     value,
-    ratio: value === null || max <= 0 ? 0 : Math.max(0, value / max),
+    ratio: !isFiniteValue(value) || max <= 0 ? 0 : Math.max(0, value / max),
   }));
 }
 
