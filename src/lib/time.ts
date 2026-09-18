@@ -10,6 +10,26 @@ export function todayRange(now: Date = new Date()): { start: number; end: number
   return { start: start.getTime(), end: end.getTime() };
 }
 
+export type DayRange = { start: number; end: number };
+
+/**
+ * 오늘을 포함한 최근 `count`일의 경계. 과거 → 오늘 순이다.
+ *
+ * `todayRange`와 같은 이유로 하루를 `86400000`으로 더하지 않는다. 현지 달력에서
+ * 날짜를 빼고 각 자정을 따로 만든다 — 서머타임 지역에서는 하루가 23시간이나
+ * 25시간이고, 월·연 경계도 `Date`가 알아서 넘긴다.
+ */
+export function recentDayRanges(now: Date, count: number): DayRange[] {
+  const ranges: DayRange[] = [];
+  for (let back = count - 1; back >= 0; back--) {
+    const day = now.getDate() - back;
+    const start = new Date(now.getFullYear(), now.getMonth(), day);
+    const end = new Date(now.getFullYear(), now.getMonth(), day + 1);
+    ranges.push({ start: start.getTime(), end: end.getTime() });
+  }
+  return ranges;
+}
+
 /** "1시간 24분 전". */
 export function formatElapsed(from: number, now: number): string {
   const minutes = Math.floor(Math.max(0, now - from) / 60_000);
