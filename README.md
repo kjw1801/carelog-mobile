@@ -9,6 +9,10 @@
 |---|---|
 | <img src="docs/screenshots/today.png" width="260" alt="오늘 요약 화면"> | <img src="docs/screenshots/records.png" width="260" alt="날짜별 기록 화면"> |
 
+| 7일 통계 — 라이트 | 7일 통계 — 다크 |
+|---|---|
+| <img src="docs/screenshots/stats-light.png" width="260" alt="7일 통계 라이트 화면"> | <img src="docs/screenshots/stats-dark.png" width="260" alt="7일 통계 다크 화면"> |
+
 | 수유 — 모유 | 수유 — 분유 |
 |---|---|
 | <img src="docs/screenshots/feeding-breast.png" width="260" alt="모유 수유 입력 화면"> | <img src="docs/screenshots/feeding-formula.png" width="260" alt="분유 수유 입력 화면"> |
