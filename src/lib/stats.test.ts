@@ -1,4 +1,10 @@
-import { barDayLabel, sleepMsByDay, toBars } from './stats';
+import {
+  barDayLabel,
+  barValueLabel,
+  sleepMinutesLabel,
+  sleepMsByDay,
+  toBars,
+} from './stats';
 
 describe('toBars', () => {
   it('그 지표의 최댓값을 1로 잡는다', () => {
@@ -48,6 +54,42 @@ describe('toBars', () => {
     expect(toBars([-1, 5]).map((b) => b.ratio)).toEqual([0, 1]);
     expect(toBars([-1, 0]).map((b) => b.ratio)).toEqual([0, 0]);
     expect(toBars([-3, -1]).map((b) => b.ratio)).toEqual([0, 0]);
+  });
+});
+
+describe('barValueLabel', () => {
+  const plain = (n: number) => `${n}`;
+
+  it('기록이 없으면 `—`다', () => {
+    expect(barValueLabel(null, plain)).toBe('—');
+  });
+
+  it('0회는 `0`이다', () => {
+    // 막대는 둘 다 없다. 숫자가 유일한 단서다.
+    expect(barValueLabel(0, plain)).toBe('0');
+  });
+
+  it('값 포맷은 지표가 정한다', () => {
+    expect(barValueLabel(3_600_000, (ms) => `${ms / 3_600_000}시간`)).toBe('1시간');
+  });
+});
+
+describe('sleepMinutesLabel', () => {
+  it('분 단위로 버린다', () => {
+    expect(sleepMinutesLabel(12 * 60_000)).toBe('12');
+    expect(sleepMinutesLabel(12 * 60_000 + 59_000)).toBe('12');
+    expect(sleepMinutesLabel(700 * 60_000)).toBe('700');
+  });
+
+  it('1분 미만은 올리지도 내리지도 않는다', () => {
+    // `1`로 올리면 없는 시간을 더하고, `0`으로 내리면 기록 없음과 같아 보인다.
+    expect(sleepMinutesLabel(1)).toBe('<1');
+    expect(sleepMinutesLabel(59_999)).toBe('<1');
+    expect(sleepMinutesLabel(60_000)).toBe('1');
+  });
+
+  it('0은 그대로 0이다', () => {
+    expect(sleepMinutesLabel(0)).toBe('0');
   });
 });
 

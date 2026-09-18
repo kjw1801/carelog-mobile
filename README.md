@@ -21,6 +21,7 @@
 - **오늘 요약** — 마지막 수유로부터 경과 시간, 오늘의 횟수·수면 시간·분유량
 - **일령** — 생년월일을 넣으면 헤더에 `D+32`. 태어난 날이 `D+0`이다
 - **화면 모드** — 시스템 설정·밝게·어둡게. 새벽 수유에 맞춘 다크 모드
+- **7일 통계** — 수유·분유량·기저귀·수면을 날짜별 막대로. 지표마다 따로 눈금을 잡는다
 - 모든 기록을 수정·삭제할 수 있고, 날짜별 타임라인으로 본다
 
 ## 기술 스택
@@ -63,7 +64,7 @@ React Native 0.86 / Expo SDK 57 / TypeScript / Expo Router / expo-sqlite
 
 ## 테스트와 검증
 
-- 단위 테스트 172개 (jest / jest-expo) — 날짜 경계, 수면 구간 병합, 수유량 파싱,
+- 단위 테스트 178개 (jest / jest-expo) — 날짜 경계, 수면 구간 병합, 수유량 파싱,
   시간 포맷, 일령 계산, 이름 길이 제한, 색상 대비, 테마 결정, 막대 비율,
   날짜별 집계
 - 서머타임 전환일 검증은 `npm run test:dst`가 `TZ=America/New_York`로 따로 돌린다.
@@ -96,8 +97,8 @@ V1은 Android 전용이다. 표시 이름은 `안녕아가`, 패키지명은
 초기 이름인 `carelog`를 그대로 쓴다 — 내부 식별자라 바꿀 실익이 없다.
 EAS 프로젝트 연결은 `extra.eas.projectId`가 담당한다.
 
-추후 계획: 통계 화면과 추이 그래프, 백업·가져오기, 수유 타이머, 유축,
-알림, 여러 아이, 클라우드 동기화.
+추후 계획: 더 긴 기간 통계와 평균 수유 간격, 백업·가져오기, 수유 타이머,
+유축, 알림, 여러 아이, 클라우드 동기화.
 
 단계별 계획과 결정의 근거는 [docs/PLAN.md](docs/PLAN.md)에 있다.
 스토어 페이지는 [play.google.com/store/apps/details?id=com.woojulab.annyeongaga](https://play.google.com/store/apps/details?id=com.woojulab.annyeongaga).

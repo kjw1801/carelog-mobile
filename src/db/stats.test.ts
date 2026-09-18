@@ -48,8 +48,8 @@ const HOUR = 3_600_000;
 describe('getRecentDayStats', () => {
   it('요청한 날짜 수만큼 과거부터 오늘 순으로 돌려준다', async () => {
     const { db } = fakeDb({});
-    const stats = await getRecentDayStats(db, NOW, 7);
-    expect(stats.map((s) => s.range)).toEqual(recentDayRanges(NOW, 7));
+    const { days } = await getRecentDayStats(db, NOW, 7);
+    expect(days.map((d) => d.range)).toEqual(recentDayRanges(NOW, 7));
   });
 
   it('날짜별 조회에 그 날의 시작과 끝을 그대로 넘긴다', async () => {
@@ -81,34 +81,34 @@ describe('getRecentDayStats', () => {
       },
       diapers: { [ranges[0].start]: 4, [ranges[1].start]: 5, [ranges[2].start]: 6 },
     });
-    const stats = await getRecentDayStats(db, NOW, 3);
-    expect(stats.map((s) => s.feedingCount)).toEqual([1, 2, 3]);
-    expect(stats.map((s) => s.diaperCount)).toEqual([4, 5, 6]);
-    expect(stats.map((s) => s.formulaMl)).toEqual([100, null, 300]);
+    const { days } = await getRecentDayStats(db, NOW, 3);
+    expect(days.map((d) => d.feedingCount)).toEqual([1, 2, 3]);
+    expect(days.map((d) => d.diaperCount)).toEqual([4, 5, 6]);
+    expect(days.map((d) => d.formulaMl)).toEqual([100, null, 300]);
   });
 
-  it('진행 중인 수면에 모든 날짜가 같은 now를 쓴다', async () => {
+  it('수면은 합계로 접지 않고 원본을 그대로 넘긴다', async () => {
+    // 진행 중인 수면은 시간이 흐르면 길어진다. 여기서 숫자로 접으면 화면이
+    // 다시 셀 수 없어 오늘 막대가 얼어붙는다. 자르기는 `sleepMsByDay`가 한다.
     const ranges = recentDayRanges(NOW, 2);
-    const { db } = fakeDb({
-      sleeps: [{ id: 1, started_at: ranges[1].start - HOUR, ended_at: null } as Sleep],
-    });
-    const stats = await getRecentDayStats(db, NOW, 2);
-    // 어제 1시간, 오늘은 자정부터 10시까지.
-    expect(stats.map((s) => s.sleepMs)).toEqual([HOUR, 10 * HOUR]);
+    const row = { id: 1, started_at: ranges[1].start - HOUR, ended_at: null } as Sleep;
+    const { db } = fakeDb({ sleeps: [row] });
+    const { sleeps } = await getRecentDayStats(db, NOW, 2);
+    expect(sleeps).toEqual([row]);
   });
 
   it('기록이 없는 날은 횟수 0과 기록 없음을 구분한다', async () => {
     const { db } = fakeDb({});
-    const [day] = await getRecentDayStats(db, NOW, 1);
-    expect(day.feedingCount).toBe(0);
-    expect(day.diaperCount).toBe(0);
-    expect(day.formulaMl).toBeNull();
-    expect(day.sleepMs).toBeNull();
+    const { days, sleeps } = await getRecentDayStats(db, NOW, 1);
+    expect(days[0].feedingCount).toBe(0);
+    expect(days[0].diaperCount).toBe(0);
+    expect(days[0].formulaMl).toBeNull();
+    expect(sleeps).toEqual([]);
   });
 
   it('0일을 요청하면 조회하지 않는다', async () => {
     const { db, calls } = fakeDb({});
-    expect(await getRecentDayStats(db, NOW, 0)).toEqual([]);
+    expect(await getRecentDayStats(db, NOW, 0)).toEqual({ days: [], sleeps: [] });
     expect(calls.sleep).toHaveLength(0);
     expect(calls.feeding).toHaveLength(0);
     expect(calls.diaper).toHaveLength(0);

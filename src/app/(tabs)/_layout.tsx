@@ -35,6 +35,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="stats"
+        options={{
+          title: '통계',
+          // 기본 라벨이 `, 통계`처럼 앞에 쉼표가 붙어 낭독된다.
+          tabBarAccessibilityLabel: '통계',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="stats-chart" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: '설정',

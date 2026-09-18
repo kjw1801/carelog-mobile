@@ -50,6 +50,29 @@ export function toBars(values: DayValue[]): Bar[] {
 }
 
 /**
+ * 막대 위 숫자.
+ *
+ * **막대만으로는 `0`과 기록 없음이 똑같이 빈칸이다.** 둘은 다른 사실이므로
+ * 여기서 갈린다 — 0회는 `0`, 기록이 없으면 `—`다.
+ */
+export function barValueLabel(value: DayValue, format: (value: number) => string): string {
+  return value === null ? '—' : format(value);
+}
+
+/**
+ * 수면 막대의 값. 단위는 분이고 카드 제목이 진다.
+ *
+ * 시간 단위로 줄이면 6분 미만이 `0.1시간`으로 부풀거나 `0`이 되어 `기록 없음`과
+ * 헷갈린다. 분으로 세되 **1분 미만은 `1`로 올리지도 `0`으로 내리지도 않는다** —
+ * 올리면 없는 시간을 더하는 셈이고, 내리면 `0`과 기록 없음이 같아 보인다.
+ * 다른 화면이 쓰는 `1분 미만`과 같은 뜻으로 `<1`을 쓴다.
+ */
+export function sleepMinutesLabel(ms: number): string {
+  if (ms <= 0) return '0';
+  return ms < 60_000 ? '<1' : `${Math.floor(ms / 60_000)}`;
+}
+
+/**
  * 막대 아래 날짜.
  *
  * 오늘은 아직 끝나지 않은 하루라 날짜 대신 `오늘`로 둔다. 다른 막대와 같은
