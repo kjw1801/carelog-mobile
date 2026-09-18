@@ -1,3 +1,6 @@
+import { calculateSleepDuration, type SleepInterval } from './sleep';
+import { type DayRange } from './time';
+
 /**
  * 막대그래프 계산.
  *
@@ -56,4 +59,34 @@ export function barDayLabel(start: number, todayStart: number): string {
   if (start === todayStart) return '오늘';
   const d = new Date(start);
   return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+/**
+ * 날짜별 수면 시간.
+ *
+ * 수면은 구간이라 하루에 걸치는 일이 흔하다. 날짜마다 따로 조회하지 않고 **전체
+ * 범위를 한 번 받아** 날짜별로 자른다. 자르고 겹치는 구간을 병합하는 일은
+ * `calculateSleepDuration`이 이미 한다.
+ *
+ * 그날과 겹치는 기록이 하나도 없으면 `0`이 아니라 `null`이다 — 안 잔 것과
+ * 기록하지 않은 것은 다르다. Today 화면과 같은 규칙이다.
+ *
+ * `now`는 모든 날짜에 같은 값을 쓴다. 날짜마다 다시 읽으면 진행 중인 수면이
+ * 날짜별로 조금씩 다른 시각까지 계산돼 합계가 어긋난다.
+ */
+export function sleepMsByDay(
+  sleeps: SleepInterval[],
+  ranges: DayRange[],
+  now: number
+): DayValue[] {
+  return ranges.map((range) => {
+    // SQL의 겹침 조건과 같아야 한다. 한쪽만 바뀌면 조회에는 있는데 화면에서
+    // 빠지는 기록이 생긴다.
+    const overlapping = sleeps.filter(
+      (sleep) =>
+        sleep.started_at < range.end && (sleep.ended_at === null || sleep.ended_at > range.start)
+    );
+    if (overlapping.length === 0) return null;
+    return calculateSleepDuration(overlapping, range.start, range.end, now);
+  });
 }

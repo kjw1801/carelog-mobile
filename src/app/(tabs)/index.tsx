@@ -8,8 +8,8 @@ import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBaby, type Baby } from '@/db/baby';
-import { getTodayDiaperCount } from '@/db/diapers';
-import { getLastFeeding, getTodaySummary, type Feeding, type TodaySummary } from '@/db/feedings';
+import { getDiaperCount } from '@/db/diapers';
+import { getLastFeeding, getFeedingSummary, type Feeding, type FeedingSummary } from '@/db/feedings';
 import {
   endSleep,
   getActiveSleep,
@@ -37,7 +37,7 @@ export default function TodayScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [last, setLast] = useState<Feeding | null>(null);
-  const [summary, setSummary] = useState<TodaySummary>({
+  const [summary, setSummary] = useState<FeedingSummary>({
     count: 0,
     formulaMl: null,
   });
@@ -74,8 +74,8 @@ export default function TodayScreen() {
     const { start, end } = todayRange(new Date(dayStart));
     const [lastRow, todayRow, diapers, sleeps, babyRow] = await Promise.all([
       getLastFeeding(db),
-      getTodaySummary(db, start, end),
-      getTodayDiaperCount(db, start, end),
+      getFeedingSummary(db, start, end),
+      getDiaperCount(db, start, end),
       listSleepsOverlapping(db, start, end),
       getBaby(db),
     ]);

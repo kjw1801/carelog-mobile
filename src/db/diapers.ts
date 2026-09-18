@@ -28,7 +28,7 @@ export function getDiaper(db: SQLiteDatabase, id: number): Promise<Diaper | null
 }
 
 /** 날짜 경계는 JS에서 계산해 숫자 범위로 조회한다. */
-export async function getTodayDiaperCount(
+export async function getDiaperCount(
   db: SQLiteDatabase,
   start: number,
   end: number

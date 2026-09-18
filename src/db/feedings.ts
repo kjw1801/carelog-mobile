@@ -50,9 +50,9 @@ export type StoredFeedingInput =
   | NewFeedingInput
   | (FeedingBaseInput & { kind: 'unspecified'; side: null; amountMl: number | null });
 
-export type TodaySummary = {
+export type FeedingSummary = {
   count: number;
-  /** 오늘 분유량을 한 번도 입력하지 않았으면 null. 0이 아니다. */
+  /** 그 범위에서 분유량을 한 번도 입력하지 않았으면 null. 0이 아니다. */
   formulaMl: number | null;
 };
 
@@ -85,11 +85,11 @@ export function getLastFeeding(db: SQLiteDatabase): Promise<Feeding | null> {
  * SUM은 대상이 전부 NULL이면 NULL을 돌려준다. 여기서는 그게 정확히 원하는
  * 값이다 — 아무도 분유량을 입력하지 않은 날은 0ml이 아니라 "기록 없음"이다.
  */
-export async function getTodaySummary(
+export async function getFeedingSummary(
   db: SQLiteDatabase,
   start: number,
   end: number
-): Promise<TodaySummary> {
+): Promise<FeedingSummary> {
   const row = await db.getFirstAsync<{ count: number; formula_ml: number | null }>(
     `SELECT COUNT(*) AS count,
             SUM(CASE WHEN kind = 'formula' THEN amount_ml END) AS formula_ml
