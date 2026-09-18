@@ -55,6 +55,11 @@
 - 그래픽 이미지 1024×500 — docs/store/feature-graphic.png (docs/store/feature-graphic.html에서 생성)
 - 휴대전화 스크린샷 1080×2340 — docs/screenshots/*.png
 
+## 등록정보 변경 규칙
+
+새 기능을 설명하거나 보여주는 스토어 등록정보는 그 기능이 포함된 production AAB와
+**같은 검토 배치로** 제출한다.
+
 ## 스크린샷 순서
 
 1. today.png — 오늘
