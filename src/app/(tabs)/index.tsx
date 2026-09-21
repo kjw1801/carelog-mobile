@@ -478,9 +478,8 @@ export default function TodayScreen() {
           두 번의 총량처럼 읽혀 `오늘 분유량`과 통계를 믿기 어려워진다. 폼으로 보낸다.
           분유 버튼은 종류를 바꿀 수 있는 폼을 여는 것이라 수유의 `상세` 역할도 한다.
           아래 기저귀 줄과 같은 모양이다 — 파란 줄은 수유, 초록 줄은 기저귀. */}
-        {/* 줄마다 제목을 단다. 색만으로는 부족하다 — `왼쪽`에는 모유라는 말이 없고,
-          `양쪽`과 아래 `둘 다`는 뜻이 비슷해 새벽에 헷갈린다. 색각 이상이면 단서가
-          아예 없다. */}
+        {/* 줄마다 제목을 단다. 색만으로는 부족하다 — `왼쪽`·`양쪽`에는 모유라는 말이
+          없어 아래 기저귀 줄과 구분되는 단서가 색뿐이다. 색각 이상이면 그마저 없다. */}
         <View style={styles.quickGroup}>
           <View style={styles.groupHeader}>
             <View style={styles.barFeedingFlat} />
@@ -629,7 +628,7 @@ function createStyles(c: Colors) {
     //
     // 행이 `alignItems: 'stretch'`라 테두리로 2px 커져도 네 버튼 높이는 같다.
     // 네 버튼은 같은 폭이다. `상세`만 좁히면 한 줄 안에서 크기가 안 맞는다.
-    // 360dp에서 (320 - 24) / 4 = 74dp씩이라 `둘 다`도 큰 글꼴에서 들어간다.
+    // 360dp에서 (320 - 24) / 4 = 74dp씩이라 세 글자인 `대소변`도 들어간다.
     detailButton: {
       backgroundColor: c.surfaceAccent,
       borderWidth: 1,
