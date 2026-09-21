@@ -4,11 +4,29 @@ import { Tabs } from 'expo-router/js-tabs';
 import { HeaderTitle, type HeaderTitleProps } from 'expo-router/react-navigation';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Alert,
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBaby, type Baby } from '@/db/baby';
-import { getDiaperCount } from '@/db/diapers';
+import {
+  DIAPER_KINDS,
+  DIAPER_KIND_LABEL,
+  DIAPER_QUICK_LABEL,
+  DIAPER_SPOKEN_LABEL,
+  deleteDiaper,
+  getDiaperCount,
+  insertDiaper,
+  type DiaperKind,
+} from '@/db/diapers';
 import {
   feedingDetail,
   getLastFeeding,
@@ -39,6 +57,18 @@ import {
 
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
+/** 원터치 저장 피드백이 떠 있는 시간. 이 안에 실행취소를 누를 수 있다. */
+const FEEDBACK_MS = 6_000;
+
+/** 방금 원터치로 저장한 기저귀. */
+type SavedDiaper = {
+  id: number;
+  kind: DiaperKind;
+  at: number;
+  /** 화면의 `오늘 기저귀`를 낙관적으로 올렸는지. 자정 경계에서는 올리지 않는다. */
+  counted: boolean;
+};
+
 export default function TodayScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -55,6 +85,11 @@ export default function TodayScreen() {
   const [baby, setBaby] = useState<Baby | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [toggling, setToggling] = useState(false);
+  // 방금 원터치로 저장한 기저귀 하나. 한 번에 하나만 들고, 새로 저장하면 교체된다.
+  const [saved, setSaved] = useState<SavedDiaper | null>(null);
+  const [savingDiaper, setSavingDiaper] = useState(false);
+  const savingDiaperRef = useRef(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // setState는 다음 렌더에야 반영되므로 연타를 막지 못한다. 실제 잠금은 ref로 걸고,
   // state는 버튼 비활성화 표시에만 쓴다.
   const togglingRef = useRef(false);
@@ -130,9 +165,88 @@ export default function TodayScreen() {
       return () => {
         clearInterval(timer);
         subscription.remove();
+        // 화면을 떠나면 피드백을 닫는다. 돌아왔을 때 남아 있으면 한참 전 기록을
+        // 가리키는 실행취소가 된다.
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+        savedTimer.current = null;
+        setSaved(null);
       };
     }, [])
   );
+
+  function showSaved(next: SavedDiaper | null) {
+    // 이전 타이머를 반드시 끈다. 남겨두면 그 타이머가 **새** 피드백을 지운다.
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = null;
+    setSaved(next);
+    if (next) savedTimer.current = setTimeout(() => setSaved(null), FEEDBACK_MS);
+  }
+
+  /**
+   * 기저귀 원터치 저장. 화면 전환 없이 지금 시각으로 한 건을 남긴다.
+   *
+   * 되돌릴 수 없는 한 번의 탭이라 저장 결과를 화면에 말해주고 실행취소를 붙인다.
+   * `오늘 기저귀` 숫자만으로는 부족하다 — 손가락과 눈이 화면 아래에 있고,
+   * 재조회가 실패해도 조용히 지나간다.
+   */
+  //
+  // `useCallback`을 벗기지 말 것. 일반 함수 선언으로 두면 React Compiler의
+  // purity 검사가 아래 `Date.now()`를 "렌더 중 호출"이라며 막는다. **인자를 받는**
+  // 핸들러에서만 나는 오탐이다 — 같은 본문에서 인자만 없애면 통과한다.
+  const onQuickDiaper = useCallback(
+    async (kind: DiaperKind) => {
+      if (savingDiaperRef.current) return;
+      savingDiaperRef.current = true;
+      setSavingDiaper(true);
+      try {
+        // 한 번만 읽는다. 저장과 피드백이 다른 분을 가리키면 안 된다.
+        const at = Date.now();
+        const id = await insertDiaper(db, { occurredAt: at, kind, note: null });
+        // 자정을 넘긴 채 눌렀으면 화면의 오늘이 어제다. 낡은 숫자에 더하지 않고
+        // now를 밀어 dayStart를 바꾼다. 그러면 위 조회가 알아서 다시 돈다.
+        const sameDay = todayRange(new Date(at)).start === dayStart;
+        if (sameDay) setDiaperCount((count) => count + 1);
+        else setNow(at);
+        showSaved({ id, kind, at, counted: sameDay });
+        // 새로 그려진 줄을 낭독기가 저절로 읽지는 않는다. 화면을 못 보면 이 알림이
+        // 저장됐다는 유일한 신호다.
+        AccessibilityInfo.announceForAccessibility(`${DIAPER_SPOKEN_LABEL[kind]}으로 기록했습니다`);
+      } catch {
+        Alert.alert('기저귀를 기록하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      } finally {
+        savingDiaperRef.current = false;
+        setSavingDiaper(false);
+      }
+    },
+    [db, dayStart]
+  );
+
+  async function onUndoDiaper() {
+    const target = saved;
+    if (savingDiaperRef.current || !target) return;
+    savingDiaperRef.current = true;
+    setSavingDiaper(true);
+    try {
+      const removed = await deleteDiaper(db, target.id);
+      showSaved(null);
+      // 지운 게 있을 때만 내린다. 이미 없는 행에 -1하면 화면이 DB보다 작아진다.
+      if (removed && target.counted) setDiaperCount((count) => Math.max(0, count - 1));
+      if (!target.counted) {
+        // 자정 경계에서 저장한 것이다. 그때 시작된 재조회와 이 삭제 중 무엇이
+        // 먼저 끝났는지 알 수 없으므로 여기서 한 번 더 읽어 맞춘다.
+        const data = await fetchAll().catch(() => null);
+        if (data) apply(data);
+      }
+      AccessibilityInfo.announceForAccessibility(
+        removed ? '기록을 취소했습니다' : '이미 지워진 기록입니다'
+      );
+    } catch {
+      Alert.alert('취소하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+    } finally {
+      savingDiaperRef.current = false;
+      setSavingDiaper(false);
+    }
+  }
 
   async function onToggleSleep() {
     if (togglingRef.current) return;
@@ -323,15 +437,56 @@ export default function TodayScreen() {
         </View>
       </ScrollView>
 
+      {/* 비어 있어도 높이를 지킨다. 피드백이 뜰 때 아래 버튼이 밀리면, 연달아
+          누르려던 손가락이 다른 종류를 찍는다 — 실수를 줄이려 넣은 것이 실수를
+          만든다. */}
+      <View style={styles.savedSlot}>
+        {saved ? (
+          <View style={styles.saved}>
+            <Text style={styles.savedText}>
+              {`${DIAPER_KIND_LABEL[saved.kind]}으로 기록했습니다 · ${formatTimeOfDay(saved.at)}`}
+            </Text>
+            <Pressable
+              onPress={() => void onUndoDiaper()}
+              disabled={savingDiaper}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: savingDiaper }}
+              accessibilityLabel={`${DIAPER_SPOKEN_LABEL[saved.kind]} 기록 실행취소`}>
+              <Text style={styles.undoText}>실행취소</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+
+      <Link href="/feeding-form" asChild>
+        <Pressable style={styles.feedingButtonFlat} accessibilityRole="button">
+          <Text style={styles.addButtonText}>수유 기록</Text>
+        </Pressable>
+      </Link>
+
+      {/* 기저귀는 화면을 넘기지 않고 지금 시각으로 바로 남긴다. 하루에 가장 자주
+          하는 동작이라 두 번의 탭과 화면 전환이 그대로 비용이다. 시각을 고치거나
+          메모를 남겨야 하면 `상세`로 기존 입력 화면에 들어간다. */}
       <View style={styles.buttons}>
-        <Link href="/feeding-form" asChild>
-          <Pressable style={styles.feedingButtonFlat} accessibilityRole="button">
-            <Text style={styles.addButtonText}>수유 기록</Text>
+        {DIAPER_KINDS.map((kind) => (
+          <Pressable
+            key={kind}
+            style={[styles.diaperQuickFlat, savingDiaper && styles.buttonBusy]}
+            onPress={() => void onQuickDiaper(kind)}
+            disabled={savingDiaper}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: savingDiaper }}
+            accessibilityLabel={`${DIAPER_SPOKEN_LABEL[kind]} 기록`}>
+            <Text style={styles.addButtonText}>{DIAPER_QUICK_LABEL[kind]}</Text>
           </Pressable>
-        </Link>
+        ))}
         <Link href="/diaper-form" asChild>
-          <Pressable style={styles.diaperButtonFlat} accessibilityRole="button">
-            <Text style={styles.addButtonText}>기저귀 기록</Text>
+          <Pressable
+            style={styles.detailButtonFlat}
+            accessibilityRole="button"
+            accessibilityLabel="기저귀 상세 입력">
+            <Text style={styles.detailText}>상세</Text>
           </Pressable>
         </Link>
       </View>
@@ -382,7 +537,19 @@ function createStyles(c: Colors) {
     cardValue: { fontSize: 32, fontWeight: '700', color: c.text },
     cardSub: { fontSize: 15, color: c.textMuted },
     cardEmpty: { fontSize: 20, color: c.textPlaceholder, paddingVertical: 6 },
-    buttons: { flexDirection: 'row', gap: 12 },
+    buttons: { flexDirection: 'row', gap: 8 },
+    // 내용이 없어도 이 높이는 유지된다. 큰 글꼴에서 두 줄이 되면 늘어난다 —
+    // 잘라내는 것보다 낫다.
+    savedSlot: { minHeight: 48, justifyContent: 'center' },
+    saved: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    savedText: { flexShrink: 1, fontSize: 15, color: c.textMuted },
+    undoText: { fontSize: 15, fontWeight: '700', color: c.accentText },
+    // 저장 중 표시. 비활성 컨트롤이라 대비 기준에서 빠진다.
+    buttonBusy: { opacity: 0.5 },
+    // `상세`는 칠하지 않는다. 옆 셋과 같은 무게로 보이면 안 되고, 새 색 조합을
+    // 만들지 않아 대비 검사에 항목이 늘지 않는다.
+    detailButton: { flexGrow: 0, flexShrink: 0, flexBasis: 60, backgroundColor: 'transparent' },
+    detailText: { fontSize: 17, fontWeight: '700', color: c.accentText },
     // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
     // 전부 먹어 다른 카드를 덮는다.
     addButton: {
@@ -425,8 +592,9 @@ function createStyles(c: Colors) {
   // 한 번만 합쳐서 단일 객체로 전달한다.
   return {
     ...s,
-    feedingButtonFlat: StyleSheet.flatten([s.addButton, s.inRow]),
-    diaperButtonFlat: StyleSheet.flatten([s.addButton, s.inRow, s.diaperButton]),
+    feedingButtonFlat: StyleSheet.flatten([s.addButton]),
+    diaperQuickFlat: StyleSheet.flatten([s.addButton, s.inRow, s.diaperButton]),
+    detailButtonFlat: StyleSheet.flatten([s.addButton, s.detailButton]),
     sleepStartFlat: StyleSheet.flatten([s.addButton, s.sleepStartButton, s.sleepRow]),
     sleepActiveFlat: StyleSheet.flatten([
       s.addButton,

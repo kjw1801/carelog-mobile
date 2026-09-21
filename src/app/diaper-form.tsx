@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import {
+  DIAPER_KINDS,
   DIAPER_KIND_LABEL,
   deleteDiaper,
   getDiaper,
@@ -26,8 +27,6 @@ import {
 import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
 import { type Colors } from '@/theme/colors';
 import { useColors } from '@/theme/useColors';
-
-const KINDS: DiaperKind[] = ['pee', 'poo', 'both'];
 
 export default function DiaperFormScreen() {
   const colors = useColors();
@@ -152,7 +151,7 @@ export default function DiaperFormScreen() {
 
         <Text style={styles.label}>종류</Text>
         <View style={styles.row}>
-          {KINDS.map((value) => {
+          {DIAPER_KINDS.map((value) => {
             const selected = kind === value;
             return (
               <Pressable
