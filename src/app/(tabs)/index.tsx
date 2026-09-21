@@ -9,7 +9,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBaby, type Baby } from '@/db/baby';
 import { getDiaperCount } from '@/db/diapers';
-import { getLastFeeding, getFeedingSummary, type Feeding, type FeedingSummary } from '@/db/feedings';
+import {
+  feedingDetail,
+  getLastFeeding,
+  getFeedingSummary,
+  todayFeedingLine,
+  type Feeding,
+  type FeedingSummary,
+} from '@/db/feedings';
 import {
   endSleep,
   getActiveSleep,
@@ -39,6 +46,8 @@ export default function TodayScreen() {
   const [last, setLast] = useState<Feeding | null>(null);
   const [summary, setSummary] = useState<FeedingSummary>({
     count: 0,
+    breastCount: 0,
+    formulaCount: 0,
     formulaMl: null,
   });
   const [diaperCount, setDiaperCount] = useState(0);
@@ -188,6 +197,20 @@ export default function TodayScreen() {
     ]);
   }
 
+  const lastDetail = last
+    ? `${formatTimeOfDay(last.occurred_at)} · ${feedingDetail(last.kind, last.side, last.amount_ml)}`
+    : null;
+  const todayLine = todayFeedingLine(summary);
+
+  // 카드를 하나의 접근성 노드로 묶는다. 묶지 않으면 조각이 넷으로 읽힌다.
+  // 가운뎃점은 화면에서 조각을 나누려고 쓴 기호다. 낭독에서는 쉼표가 맞다.
+  const feedingLabel = last
+    ? ['마지막 수유', formatElapsed(last.occurred_at, now), lastDetail, todayLine]
+        .join(', ')
+        .split(' · ')
+        .join(', ')
+    : '마지막 수유, 기록 없음';
+
   const elapsedSleep = activeSleep ? formatDuration(now - activeSleep.started_at) : null;
   const sleepOverdue = activeSleep ? now - activeSleep.started_at >= TWELVE_HOURS : false;
 
@@ -258,33 +281,24 @@ export default function TodayScreen() {
       <Tabs.Screen options={screenOptions} />
 
       <ScrollView style={styles.cards} contentContainerStyle={styles.cardsContent}>
-        <View style={styles.card}>
+        {/* 수유는 한 카드다. 마지막 수유·오늘 횟수·분유량은 한 주제인데 자리
+            때문에 흩어져 있었다 — 분유량이 수면과 한 줄에 있을 이유가 없다.
+            큰 숫자는 경과 시간 하나뿐이다. 이 화면이 답하는 질문이 그것이다. */}
+        <View style={styles.card} accessible accessibilityLabel={feedingLabel}>
           <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
             <>
               <Text style={styles.cardValue} numberOfLines={1}>
                 {formatElapsed(last.occurred_at, now)}
               </Text>
-              <Text style={styles.cardSub}>{formatTimeOfDay(last.occurred_at)}</Text>
+              {/* 한 줄로 고정하지 않는다. 좁은 화면이나 큰 글꼴에서 잘리는 대신
+                  넘어가야 한다. */}
+              <Text style={styles.cardSub}>{lastDetail}</Text>
+              <Text style={styles.cardSub}>{todayLine}</Text>
             </>
           ) : (
             <Text style={styles.cardEmpty}>기록 없음</Text>
           )}
-        </View>
-
-        <View style={styles.cardRow}>
-          <View style={styles.cardHalfFlat}>
-            <Text style={styles.cardLabel}>오늘 수유</Text>
-            <Text style={styles.cardValue} numberOfLines={1}>
-              {summary.count}회
-            </Text>
-          </View>
-          <View style={styles.cardHalfFlat}>
-            <Text style={styles.cardLabel}>오늘 기저귀</Text>
-            <Text style={styles.cardValue} numberOfLines={1}>
-              {diaperCount}회
-            </Text>
-          </View>
         </View>
 
         <View style={styles.cardRow}>
@@ -300,18 +314,11 @@ export default function TodayScreen() {
               </Text>
             )}
           </View>
-          {/* 분유만 더한다. 모유는 양이 없고, 종류를 물어보기 전에 적힌 양은
-              분유였는지 알 수 없다. 한 번도 입력하지 않았다면 0ml이 아니라
-              "기록 없음"이다. */}
           <View style={styles.cardHalfFlat}>
-            <Text style={styles.cardLabel}>오늘 분유량</Text>
-            {summary.formulaMl === null ? (
-              <Text style={styles.cardEmpty}>기록 없음</Text>
-            ) : (
-              <Text style={styles.cardValue} numberOfLines={1}>
-                {summary.formulaMl}ml
-              </Text>
-            )}
+            <Text style={styles.cardLabel}>오늘 기저귀</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {diaperCount}회
+            </Text>
           </View>
         </View>
       </ScrollView>
