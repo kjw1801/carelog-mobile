@@ -39,7 +39,7 @@ export default function FeedingFormScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const db = useSQLiteContext();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, kind: kindParam } = useLocalSearchParams<{ id?: string; kind?: string }>();
   const feedingId = id ? Number(id) : null;
   const isEditing = feedingId !== null;
 
@@ -47,9 +47,16 @@ export default function FeedingFormScreen() {
   // 새 기록은 종류를 고르기 전까지 null이다. 기본값을 주면 고르지 않은 채
   // 저장돼 사실이 아닌 종류가 남는다.
   //
-  // 기존 기록(unspecified)을 열면 여기도 null이다. 그대로 저장하면
-  // unspecified가 유지되고, 모유·분유를 고르면 그때 전환된다.
-  const [kind, setKind] = useState<NewFeedingKind | null>(null);
+  // **부른 쪽이 종류를 정해 보낸 경우만 예외다.** 오늘 화면의 `분유` 버튼이
+  // 그렇다 — 이름이 이미 종류를 말하고 있어서, 열자마자 비어 있으면 저장할 때
+  // 오류창부터 만난다. 값은 열거형에 맞을 때만 받는다.
+  //
+  // **수정에는 적용하지 않는다.** 기존 종류는 아래 조회가 채운다. 기존
+  // 기록(unspecified)을 열면 여기도 null이라, 그대로 저장하면 unspecified가
+  // 유지되고 모유·분유를 고르면 그때 전환된다.
+  const [kind, setKind] = useState<NewFeedingKind | null>(() =>
+    !isEditing && (kindParam === 'breast' || kindParam === 'formula') ? kindParam : null
+  );
   const [wasUnspecified, setWasUnspecified] = useState(false);
   const [side, setSide] = useState<BreastSide | null>(null);
   const [amountText, setAmountText] = useState('');

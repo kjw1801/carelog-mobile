@@ -501,10 +501,12 @@ export default function TodayScreen() {
             <Pressable
               style={[styles.detailButtonFlat, savingRecord && styles.buttonBusy]}
               disabled={savingRecord}
-              onPress={() => router.push('/feeding-form')}
+              // 분유를 미리 골라 보낸다. 이름이 `분유`인 버튼을 눌렀는데 종류가
+              // 비어 있으면, 그대로 저장했을 때 오류창부터 만난다.
+              onPress={() => router.push('/feeding-form?kind=formula')}
               accessibilityRole="button"
               accessibilityState={{ disabled: savingRecord }}
-              accessibilityLabel="분유와 상세 입력">
+              accessibilityLabel="분유 기록 입력">
               <FixedText style={styles.detailText}>분유</FixedText>
             </Pressable>
           </View>
