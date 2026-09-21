@@ -1,8 +1,3 @@
-import { DatabaseSync } from 'node:sqlite';
-
-import type { SQLiteDatabase } from 'expo-sqlite';
-
-import { migrateDbIfNeeded } from './migrations';
 import {
   feedingDetail,
   getFeedingSummary,
@@ -10,6 +5,7 @@ import {
   todayFeedingLine,
   type FeedingSummary,
 } from './feedings';
+import { memoryDb } from './memory-db';
 
 describe('feedingDetail', () => {
   it('모유는 위치를 붙인다', () => {
@@ -66,39 +62,6 @@ describe('todayFeedingLine', () => {
     expect(todayFeedingLine(summary({ count: 1 }))).toBe('오늘 기존 기록 1회');
   });
 });
-
-/**
- * 집계 SQL을 **실제로 실행한다.** 가짜 DB에 행을 돌려주게 하면 별칭을 한쪽만
- * 바꿔도 테스트가 통과한다 — 검사하려는 것이 바로 그 연결이라 의미가 없다.
- *
- * 스키마는 마이그레이션을 그대로 돌려서 만든다. 여기서 CREATE TABLE을 베껴
- * 두면 실제 스키마가 바뀔 때 테스트만 옛 모양으로 남는다.
- */
-async function memoryDb(): Promise<SQLiteDatabase> {
-  const sqlite = new DatabaseSync(':memory:');
-  const db = {
-    getFirstAsync: async (sql: string, ...args: unknown[]) =>
-      (sqlite.prepare(sql).get(...(args as never[])) ?? null) as never,
-    getAllAsync: async (sql: string, ...args: unknown[]) =>
-      sqlite.prepare(sql).all(...(args as never[])) as never,
-    runAsync: async (sql: string, ...args: unknown[]) => {
-      const result = sqlite.prepare(sql).run(...(args as never[]));
-      return {
-        lastInsertRowId: Number(result.lastInsertRowid),
-        changes: Number(result.changes),
-      };
-    },
-    execAsync: async (sql: string) => {
-      sqlite.exec(sql);
-    },
-    withExclusiveTransactionAsync: async (task: (txn: SQLiteDatabase) => Promise<void>) => {
-      await task(db);
-    },
-  } as unknown as SQLiteDatabase;
-
-  await migrateDbIfNeeded(db);
-  return db;
-}
 
 const DAY = new Date(2026, 8, 18).getTime();
 const NEXT = new Date(2026, 8, 19).getTime();

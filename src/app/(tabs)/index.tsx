@@ -90,6 +90,10 @@ export default function TodayScreen() {
   const [savingDiaper, setSavingDiaper] = useState(false);
   const savingDiaperRef = useRef(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 화면이 직접 올린 숫자를 **그 전에 시작된** 조회가 덮지 않게 한다. 조회는
+  // 시작 시점의 DB를 읽으므로, 늦게 도착한 옛 결과가 방금 더한 1을 지운다.
+  // 쓰기마다 올리고, 조회는 시작할 때의 값과 달라졌으면 결과를 버린다.
+  const writeSeq = useRef(0);
   // setState는 다음 렌더에야 반영되므로 연타를 막지 못한다. 실제 잠금은 ref로 걸고,
   // state는 버튼 비활성화 표시에만 쓴다.
   const togglingRef = useRef(false);
@@ -140,10 +144,11 @@ export default function TodayScreen() {
   useFocusEffect(
     useCallback(() => {
       let alive = true;
+      const seq = writeSeq.current;
       // 조회에 실패하면 화면을 그대로 둔다. 다음 포커스나 날짜 변경 때 다시 읽는다.
       fetchAll()
         .then((data) => {
-          if (alive) apply(data);
+          if (alive && seq === writeSeq.current) apply(data);
         })
         .catch(() => {});
       return () => {
@@ -202,6 +207,7 @@ export default function TodayScreen() {
         // 한 번만 읽는다. 저장과 피드백이 다른 분을 가리키면 안 된다.
         const at = Date.now();
         const id = await insertDiaper(db, { occurredAt: at, kind, note: null });
+        writeSeq.current += 1;
         // 자정을 넘긴 채 눌렀으면 화면의 오늘이 어제다. 낡은 숫자에 더하지 않고
         // now를 밀어 dayStart를 바꾼다. 그러면 위 조회가 알아서 다시 돈다.
         const sameDay = todayRange(new Date(at)).start === dayStart;
@@ -228,14 +234,16 @@ export default function TodayScreen() {
     setSavingDiaper(true);
     try {
       const removed = await deleteDiaper(db, target.id);
+      if (removed) writeSeq.current += 1;
       showSaved(null);
       // 지운 게 있을 때만 내린다. 이미 없는 행에 -1하면 화면이 DB보다 작아진다.
       if (removed && target.counted) setDiaperCount((count) => Math.max(0, count - 1));
       if (!target.counted) {
         // 자정 경계에서 저장한 것이다. 그때 시작된 재조회와 이 삭제 중 무엇이
         // 먼저 끝났는지 알 수 없으므로 여기서 한 번 더 읽어 맞춘다.
+        const seq = writeSeq.current;
         const data = await fetchAll().catch(() => null);
-        if (data) apply(data);
+        if (data && seq === writeSeq.current) apply(data);
       }
       AccessibilityInfo.announceForAccessibility(
         removed ? '기록을 취소했습니다' : '이미 지워진 기록입니다'
@@ -289,8 +297,9 @@ export default function TodayScreen() {
       }
       // 성공했든 중복이었든 화면을 다시 맞춘다. 갱신 실패는 알리지 않는다 —
       // 다음 포커스나 날짜 변경 때 다시 읽는다.
+      const seq = writeSeq.current;
       const data = await fetchAll().catch(() => null);
-      if (data) apply(data);
+      if (data && seq === writeSeq.current) apply(data);
     } finally {
       togglingRef.current = false;
       setToggling(false);
@@ -482,9 +491,12 @@ export default function TodayScreen() {
           </Pressable>
         ))}
         <Link href="/diaper-form" asChild>
+          {/* Link asChild는 스타일 배열을 받지 않는다. 미리 합쳐 둔 것 중 고른다. */}
           <Pressable
-            style={styles.detailButtonFlat}
+            style={savingDiaper ? styles.detailBusyFlat : styles.detailButtonFlat}
+            disabled={savingDiaper}
             accessibilityRole="button"
+            accessibilityState={{ disabled: savingDiaper }}
             accessibilityLabel="기저귀 상세 입력">
             <Text style={styles.detailText}>상세</Text>
           </Pressable>
@@ -595,6 +607,7 @@ function createStyles(c: Colors) {
     feedingButtonFlat: StyleSheet.flatten([s.addButton]),
     diaperQuickFlat: StyleSheet.flatten([s.addButton, s.inRow, s.diaperButton]),
     detailButtonFlat: StyleSheet.flatten([s.addButton, s.detailButton]),
+    detailBusyFlat: StyleSheet.flatten([s.addButton, s.detailButton, s.buttonBusy]),
     sleepStartFlat: StyleSheet.flatten([s.addButton, s.sleepStartButton, s.sleepRow]),
     sleepActiveFlat: StyleSheet.flatten([
       s.addButton,
