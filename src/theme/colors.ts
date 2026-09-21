@@ -59,8 +59,6 @@ export type Colors = {
   sleepOverdue: string;
   /** 기록 목록의 수면 점. */
   sleepDot: string;
-  /** 수면 시작 버튼 위의 침대 아이콘. */
-  sleepIconIdle: string;
 };
 
 const light: Colors = {
@@ -87,15 +85,14 @@ const light: Colors = {
   sleepActive: '#b85c00',
   sleepOverdue: '#9f3a20',
   sleepDot: '#5b597a',
-  sleepIconIdle: '#c7c6d4',
 };
 
 /**
  * 다크 팔레트.
  *
- * 면과 글자는 전부 다른 값이다. 같은 값을 쓰는 것은 채워진 버튼 색과 `onAccent`,
- * `sleepIconIdle`뿐이다 — 버튼은 자기 색 위에 글자를 얹으므로 화면 배경이 바뀌어도
- * 글자 대비가 그대로 유지된다.
+ * 면과 글자는 전부 다른 값이다. 같은 값을 쓰는 것은 채워진 버튼 색과 `onAccent`
+ * 뿐이다 — 버튼은 자기 색 위에 글자를 얹으므로 화면 배경이 바뀌어도 글자
+ * 대비가 그대로 유지된다.
  *
  * 다만 **버튼이 배경과 구분되는지는 별개 문제다.** `sleepIdle`의 `#3f3d56`은 검은
  * 배경에서 2.01:1이라 버튼 경계가 사라져 `#5f5b80`으로 올렸다. 나머지 버튼 색은
@@ -125,7 +122,6 @@ const dark: Colors = {
   sleepActive: '#b85c00',
   sleepOverdue: '#9f3a20',
   sleepDot: '#8a87ad',
-  sleepIconIdle: '#c7c6d4',
 };
 
 export const palettes: Record<ThemeName, Colors> = { light, dark };

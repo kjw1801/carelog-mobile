@@ -153,8 +153,15 @@ export async function updateFeeding(
   );
 }
 
-export async function deleteFeeding(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM feedings WHERE id = ?', id);
+/**
+ * 지웠으면 `true`. 이미 없는 id면 `false`다 — `deleteDiaper`·`deleteSleep`과 같다.
+ *
+ * **폼의 성공 Toast가 이 값을 본다.** 목록이 낡아 이미 지워진 행을 다시 지우면
+ * 아무 일도 없었으므로 `수유 기록을 삭제했습니다`는 거짓말이 된다.
+ */
+export async function deleteFeeding(db: SQLiteDatabase, id: number): Promise<boolean> {
+  const result = await db.runAsync('DELETE FROM feedings WHERE id = ?', id);
+  return result.changes > 0;
 }
 
 export const BREAST_SIDE_LABEL: Record<BreastSide, string> = {

@@ -48,7 +48,6 @@ const PAIRS: [keyof Colors, keyof Colors, number, string][] = [
   ['accent', 'surface', NON_TEXT, '수유 점'],
   ['diaper', 'surface', NON_TEXT, '기저귀 점'],
   ['sleepDot', 'surface', NON_TEXT, '수면 점'],
-  ['sleepIconIdle', 'sleepIdle', NON_TEXT, '침대 아이콘'],
 
   // 입력칸 테두리.
   // 폼 화면은 바탕이 `surface`이고 입력칸에 채움이 없다. **테두리가 입력 영역을

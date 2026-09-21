@@ -1,11 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Link, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { HeaderTitle, type HeaderTitleProps } from 'expo-router/react-navigation';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
   Alert,
   AppState,
   Pressable,
@@ -13,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type TextProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,18 +20,18 @@ import { getBaby, type Baby } from '@/db/baby';
 import {
   DIAPER_KINDS,
   DIAPER_KIND_LABEL,
-  DIAPER_QUICK_LABEL,
-  DIAPER_SPOKEN_LABEL,
-  deleteDiaper,
   getDiaperCount,
   insertDiaper,
   type DiaperKind,
 } from '@/db/diapers';
 import {
+  BREAST_SIDE_LABEL,
   feedingDetail,
   getLastFeeding,
+  insertFeeding,
   getFeedingSummary,
   todayFeedingLine,
+  type BreastSide,
   type Feeding,
   type FeedingSummary,
 } from '@/db/feedings';
@@ -43,6 +43,7 @@ import {
   type Sleep,
 } from '@/db/sleeps';
 import { daysSinceBirth } from '@/lib/date';
+import { showSuccessMessage } from '@/lib/feedback';
 import { clampName } from '@/lib/name';
 import { calculateSleepDuration } from '@/lib/sleep';
 import { type Colors } from '@/theme/colors';
@@ -57,17 +58,21 @@ import {
 
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
-/** 원터치 저장 피드백이 떠 있는 시간. 이 안에 실행취소를 누를 수 있다. */
-const FEEDBACK_MS = 6_000;
+const BREAST_SIDES: BreastSide[] = ['left', 'right', 'both'];
 
-/** 방금 원터치로 저장한 기저귀. */
-type SavedDiaper = {
-  id: number;
-  kind: DiaperKind;
-  at: number;
-  /** 화면의 `오늘 기저귀`를 낙관적으로 올렸는지. 자정 경계에서는 올리지 않는다. */
-  counted: boolean;
-};
+/**
+ * 하단 빠른 기록 전용 글자. **시스템 글꼴 배율을 따르지 않는다.**
+ *
+ * 이 영역은 높이가 고정돼야 한다. 글꼴을 키우면 버튼 세 줄이 같이 커지면서 위
+ * 카드 영역을 밀어내는데, 카드가 `flex: 1`이라 밀린 만큼 잘린다. 1.5배에서
+ * `오늘 수면`·`오늘 기저귀`가 윗변만 남았다.
+ *
+ * 읽는 화면은 그대로 둔다 — 상단 카드, 기록 목록, 통계, 설정, 입력 폼은 계속
+ * 시스템 배율을 따른다. 한 손으로 누르는 곳만 고정한다.
+ */
+function FixedText(props: TextProps) {
+  return <Text {...props} allowFontScaling={false} />;
+}
 
 export default function TodayScreen() {
   const colors = useColors();
@@ -85,11 +90,9 @@ export default function TodayScreen() {
   const [baby, setBaby] = useState<Baby | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [toggling, setToggling] = useState(false);
-  // 방금 원터치로 저장한 기저귀 하나. 한 번에 하나만 들고, 새로 저장하면 교체된다.
-  const [saved, setSaved] = useState<SavedDiaper | null>(null);
-  const [savingDiaper, setSavingDiaper] = useState(false);
-  const savingDiaperRef = useRef(false);
-  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 수유와 기저귀가 같은 잠금을 쓴다. 한 번에 한 건만 저장한다.
+  const [savingRecord, setSavingRecord] = useState(false);
+  const savingRecordRef = useRef(false);
   // 화면이 직접 올린 숫자를 **그 전에 시작된** 조회가 덮지 않게 한다. 조회는
   // 시작 시점의 DB를 읽으므로, 늦게 도착한 옛 결과가 방금 더한 1을 지운다.
   // 쓰기마다 올리고, 조회는 시작할 때의 값과 달라졌으면 결과를 버린다.
@@ -170,29 +173,16 @@ export default function TodayScreen() {
       return () => {
         clearInterval(timer);
         subscription.remove();
-        // 화면을 떠나면 피드백을 닫는다. 돌아왔을 때 남아 있으면 한참 전 기록을
-        // 가리키는 실행취소가 된다.
-        if (savedTimer.current) clearTimeout(savedTimer.current);
-        savedTimer.current = null;
-        setSaved(null);
       };
     }, [])
   );
 
-  function showSaved(next: SavedDiaper | null) {
-    // 이전 타이머를 반드시 끈다. 남겨두면 그 타이머가 **새** 피드백을 지운다.
-    if (savedTimer.current) clearTimeout(savedTimer.current);
-    savedTimer.current = null;
-    setSaved(next);
-    if (next) savedTimer.current = setTimeout(() => setSaved(null), FEEDBACK_MS);
-  }
-
   /**
    * 기저귀 원터치 저장. 화면 전환 없이 지금 시각으로 한 건을 남긴다.
    *
-   * 되돌릴 수 없는 한 번의 탭이라 저장 결과를 화면에 말해주고 실행취소를 붙인다.
-   * `오늘 기저귀` 숫자만으로는 부족하다 — 손가락과 눈이 화면 아래에 있고,
-   * 재조회가 실패해도 조용히 지나간다.
+   * 저장 결과를 Toast로 말해준다. `오늘 기저귀` 숫자만으로는 부족하다 —
+   * 손가락과 눈이 화면 아래에 있고, 재조회가 실패해도 조용히 지나간다.
+   * Toast는 재조회 성공 여부와 무관하게 "행이 생겼다"는 사실만 전한다.
    */
   //
   // `useCallback`을 벗기지 말 것. 일반 함수 선언으로 두면 React Compiler의
@@ -200,61 +190,83 @@ export default function TodayScreen() {
   // 핸들러에서만 나는 오탐이다 — 같은 본문에서 인자만 없애면 통과한다.
   const onQuickDiaper = useCallback(
     async (kind: DiaperKind) => {
-      if (savingDiaperRef.current) return;
-      savingDiaperRef.current = true;
-      setSavingDiaper(true);
+      if (savingRecordRef.current) return;
+      savingRecordRef.current = true;
+      setSavingRecord(true);
       try {
         // 한 번만 읽는다. 저장과 피드백이 다른 분을 가리키면 안 된다.
         const at = Date.now();
-        const id = await insertDiaper(db, { occurredAt: at, kind, note: null });
+        await insertDiaper(db, { occurredAt: at, kind, note: null });
         writeSeq.current += 1;
         // 자정을 넘긴 채 눌렀으면 화면의 오늘이 어제다. 낡은 숫자에 더하지 않고
         // now를 밀어 dayStart를 바꾼다. 그러면 위 조회가 알아서 다시 돈다.
         const sameDay = todayRange(new Date(at)).start === dayStart;
         if (sameDay) setDiaperCount((count) => count + 1);
         else setNow(at);
-        showSaved({ id, kind, at, counted: sameDay });
-        // 새로 그려진 줄을 낭독기가 저절로 읽지는 않는다. 화면을 못 보면 이 알림이
-        // 저장됐다는 유일한 신호다.
-        AccessibilityInfo.announceForAccessibility(`${DIAPER_SPOKEN_LABEL[kind]}으로 기록했습니다`);
+        showSuccessMessage(`${DIAPER_KIND_LABEL[kind]}으로 기록했습니다`);
       } catch {
         Alert.alert('기저귀를 기록하지 못했습니다', '잠시 후 다시 시도해 주세요.');
       } finally {
-        savingDiaperRef.current = false;
-        setSavingDiaper(false);
+        savingRecordRef.current = false;
+        setSavingRecord(false);
       }
     },
     [db, dayStart]
   );
 
-  async function onUndoDiaper() {
-    const target = saved;
-    if (savingDiaperRef.current || !target) return;
-    savingDiaperRef.current = true;
-    setSavingDiaper(true);
-    try {
-      const removed = await deleteDiaper(db, target.id);
-      if (removed) writeSeq.current += 1;
-      showSaved(null);
-      // 지운 게 있을 때만 내린다. 이미 없는 행에 -1하면 화면이 DB보다 작아진다.
-      if (removed && target.counted) setDiaperCount((count) => Math.max(0, count - 1));
-      if (!target.counted) {
-        // 자정 경계에서 저장한 것이다. 그때 시작된 재조회와 이 삭제 중 무엇이
-        // 먼저 끝났는지 알 수 없으므로 여기서 한 번 더 읽어 맞춘다.
+  /**
+   * 모유 빠른 저장. 위치만 고르면 지금 시각으로 한 건을 남긴다.
+   *
+   * 분유는 여기 없다. 양이 선택 입력이라 원터치를 열어두면 `amount_ml`이 빈
+   * 기록이 쌓이고, 그러면 `분유 2회 · 120ml`가 두 번의 총량처럼 읽힌다. 기록된
+   * 총량의 완결성이 떨어져 `오늘 분유량`과 통계 막대를 믿기 어려워진다.
+   */
+  const onQuickFeeding = useCallback(
+    async (side: BreastSide) => {
+      if (savingRecordRef.current) return;
+      savingRecordRef.current = true;
+      setSavingRecord(true);
+      try {
+        const at = Date.now();
+        await insertFeeding(db, {
+          occurredAt: at,
+          kind: 'breast',
+          side,
+          amountMl: null,
+          note: null,
+        });
+        writeSeq.current += 1;
+        showSuccessMessage(`모유 ${BREAST_SIDE_LABEL[side]}으로 기록했습니다`);
+
+        // 자정을 넘긴 채 눌렀으면 화면의 오늘이 어제다. 여기서 `fetchAll`을 부르면
+        // **이 렌더가 잡고 있는 낡은 `dayStart`**로 어제 범위를 조회해 어제 집계를
+        // 한 번 덧씌운다. 조회하지 말고 now만 밀어 `dayStart`를 바꾼다 —
+        // 그러면 위 포커스 이펙트가 새 날짜로 다시 조회한다.
+        if (todayRange(new Date(at)).start !== dayStart) {
+          setNow(at);
+          return;
+        }
+
+        // 기저귀와 달리 낙관적으로 숫자를 올리지 않는다. 바뀌는 것이 `오늘 모유
+        // N회`만이 아니라 `마지막 수유` 줄 전체라 한 번에 다시 읽는 편이 맞다.
+        //
+        // **기다리지 않는다.** `await`하면 그동안 버튼이 잠겨 다음 한 건을 못 누른다.
+        // 저장됐다는 사실은 이미 Toast가 알렸고, 낡은 결과는 `writeSeq`가 막는다.
         const seq = writeSeq.current;
-        const data = await fetchAll().catch(() => null);
-        if (data && seq === writeSeq.current) apply(data);
+        void fetchAll()
+          .then((data) => {
+            if (seq === writeSeq.current) apply(data);
+          })
+          .catch(() => {});
+      } catch {
+        Alert.alert('수유를 기록하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+      } finally {
+        savingRecordRef.current = false;
+        setSavingRecord(false);
       }
-      AccessibilityInfo.announceForAccessibility(
-        removed ? '기록을 취소했습니다' : '이미 지워진 기록입니다'
-      );
-    } catch {
-      Alert.alert('취소하지 못했습니다', '잠시 후 다시 시도해 주세요.');
-    } finally {
-      savingDiaperRef.current = false;
-      setSavingDiaper(false);
-    }
-  }
+    },
+    [db, dayStart, fetchAll, apply]
+  );
 
   async function onToggleSleep() {
     if (togglingRef.current) return;
@@ -267,8 +279,12 @@ export default function TodayScreen() {
           // 진행 중인 행만 UPDATE되므로, 낡은 상태로 눌렀으면 아무것도 안 바뀐다.
           // 그때는 순번을 올리지 않는다 — 바뀐 게 없고, 낡은 화면을 고칠 조회를
           // 오히려 버리게 된다.
-          if (ended) writeSeq.current += 1;
-          else Alert.alert('이미 종료된 수면입니다');
+          if (ended) {
+            writeSeq.current += 1;
+            showSuccessMessage('수면을 종료했습니다');
+          } else {
+            Alert.alert('이미 종료된 수면입니다');
+          }
         } catch {
           Alert.alert('수면을 종료하지 못했습니다', '잠시 후 다시 시도해 주세요.');
           return;
@@ -277,6 +293,7 @@ export default function TodayScreen() {
         try {
           await startSleep(db, Date.now());
           writeSeq.current += 1;
+          showSuccessMessage('수면을 시작했습니다');
         } catch {
           // 유니크 인덱스가 진행 중 수면을 하나로 막으므로 중복 시작이 여기로 온다.
           // 잠김·연결 오류도 같은 자리로 오니, 실제 진행 중 기록이 있을 때만
@@ -313,18 +330,12 @@ export default function TodayScreen() {
     }
   }
 
-  // 진행 중 수면은 실수로 눌러도 즉시 종료되지 않도록 한 번 확인한다.
-  // 시작은 잘못 눌러도 바로 다시 눌러 되돌릴 수 있으므로 묻지 않는다.
+  // 확인창을 두지 않는다. 전에는 전폭 버튼이라 아무 데나 스쳐도 종료됐지만,
+  // 이제 누를 수 있는 곳이 오른쪽 80dp뿐이라 실수로 닿기 어렵다. 잘못 눌렀으면
+  // 기록 탭에서 종료 시각을 고치거나 지우면 된다.
   function onPressSleep() {
     if (togglingRef.current) return;
-    if (!activeSleep) {
-      void onToggleSleep();
-      return;
-    }
-    Alert.alert('수면을 종료할까요?', undefined, [
-      { text: '취소', style: 'cancel' },
-      { text: '종료', onPress: () => void onToggleSleep() },
-    ]);
+    void onToggleSleep();
   }
 
   const lastDetail = last
@@ -342,15 +353,20 @@ export default function TodayScreen() {
     : '마지막 수유, 기록 없음';
 
   const elapsedSleep = activeSleep ? formatDuration(now - activeSleep.started_at) : null;
+
   const sleepOverdue = activeSleep ? now - activeSleep.started_at >= TWELVE_HOURS : false;
 
-  // 라벨을 붙이면 자식 Text가 낭독에서 빠진다. 12시간 초과는 화면에서 색으로만
-  // 알리므로 낭독에는 말로 넣는다 — 색은 읽히지 않는다.
-  const sleepAccessibilityLabel = activeSleep
-    ? ['수면 중', elapsedSleep, sleepOverdue ? '12시간 초과' : null, '탭하여 수면 종료 확인']
-        .filter(Boolean)
-        .join(', ')
-    : '수면 시작';
+  // 한 줄로 적는다. 상태가 바뀐 것은 오른쪽 버튼 색과 글자(`시작`/`종료`)가
+  // 이미 말한다.
+  const sleepLine = !activeSleep
+    ? '수면'
+    : `${sleepOverdue ? '12시간 초과' : '수면 중'} · ${elapsedSleep}`;
+
+  // 12시간 초과는 화면에서 색으로만 알리므로 낭독에는 말로 넣는다 — 색은 읽히지
+  // 않는다. 상태만 읽고, 무엇을 누를지는 옆 버튼이 스스로 말한다.
+  const sleepStatusLabel = activeSleep
+    ? ['수면 중', elapsedSleep, sleepOverdue ? '12시간 초과' : null].filter(Boolean).join(', ')
+    : '진행 중인 수면 없음';
 
   // 탭 라벨은 `오늘`로 두고 헤더 제목만 바꾼다. `title`은 둘 다 바꾼다.
   // setOptions가 매 렌더 새 객체를 받으면 불필요한 재설정이 생긴다.
@@ -424,6 +440,9 @@ export default function TodayScreen() {
               {/* 한 줄로 고정하지 않는다. 좁은 화면이나 큰 글꼴에서 잘리는 대신
                   넘어가야 한다. */}
               <Text style={styles.cardSub}>{lastDetail}</Text>
+              {/* 위 두 줄은 **지금**을 말하고 아래 줄은 **하루 합계**를 말한다.
+                  같은 크기·같은 색이라 한 덩어리로 읽혀서 선으로 나눈다. */}
+              <View style={styles.cardDivider} />
               <Text style={styles.cardSub}>{todayLine}</Text>
             </>
           ) : (
@@ -439,100 +458,125 @@ export default function TodayScreen() {
             {todaySleeps.length === 0 ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValue} numberOfLines={1}>
+              <Text style={styles.cardValueSmall} numberOfLines={1}>
                 {formatDurationCompact(sleepMs)}
               </Text>
             )}
           </View>
           <View style={styles.cardHalfFlat}>
             <Text style={styles.cardLabel}>오늘 기저귀</Text>
-            <Text style={styles.cardValue} numberOfLines={1}>
+            <Text style={styles.cardValueSmall} numberOfLines={1}>
               {diaperCount}회
             </Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* 비어 있어도 높이를 지킨다. 피드백이 뜰 때 아래 버튼이 밀리면, 연달아
-          누르려던 손가락이 다른 종류를 찍는다 — 실수를 줄이려 넣은 것이 실수를
-          만든다. */}
-      <View style={styles.savedSlot}>
-        {saved ? (
-          <View style={styles.saved}>
-            <Text style={styles.savedText}>
-              {`${DIAPER_KIND_LABEL[saved.kind]}으로 기록했습니다 · ${formatTimeOfDay(saved.at)}`}
-            </Text>
+      <View style={styles.quickArea}>
+        {/* 모유는 위치만 고르면 끝이라 한 번에 저장한다. 분유는 양이 선택 입력이라
+          원터치를 열면 `amount_ml`이 빈 기록이 쌓이고, 그러면 `분유 2회 · 120ml`가
+          두 번의 총량처럼 읽혀 `오늘 분유량`과 통계를 믿기 어려워진다. 폼으로 보낸다.
+          분유 버튼은 종류를 바꿀 수 있는 폼을 여는 것이라 수유의 `상세` 역할도 한다.
+          아래 기저귀 줄과 같은 모양이다 — 파란 줄은 수유, 초록 줄은 기저귀. */}
+        {/* 줄마다 제목을 단다. 색만으로는 부족하다 — `왼쪽`에는 모유라는 말이 없고,
+          `양쪽`과 아래 `둘 다`는 뜻이 비슷해 새벽에 헷갈린다. 색각 이상이면 단서가
+          아예 없다. */}
+        <View style={styles.quickGroup}>
+          <View style={styles.groupHeader}>
+            <View style={styles.barFeedingFlat} />
+            <FixedText style={styles.groupTitle}>수유 기록</FixedText>
+          </View>
+          <View style={styles.buttons}>
+            {BREAST_SIDES.map((side) => (
+              <Pressable
+                key={side}
+                style={[styles.sideButtonFlat, savingRecord && styles.buttonBusy]}
+                onPress={() => void onQuickFeeding(side)}
+                disabled={savingRecord}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: savingRecord }}
+                accessibilityLabel={`모유 ${BREAST_SIDE_LABEL[side]} 기록`}>
+                <FixedText style={styles.addButtonText}>{BREAST_SIDE_LABEL[side]}</FixedText>
+              </Pressable>
+            ))}
             <Pressable
-              onPress={() => void onUndoDiaper()}
-              disabled={savingDiaper}
-              hitSlop={12}
+              style={[styles.detailButtonFlat, savingRecord && styles.buttonBusy]}
+              disabled={savingRecord}
+              onPress={() => router.push('/feeding-form')}
               accessibilityRole="button"
-              accessibilityState={{ disabled: savingDiaper }}
-              accessibilityLabel={`${DIAPER_SPOKEN_LABEL[saved.kind]} 기록 실행취소`}>
-              <Text style={styles.undoText}>실행취소</Text>
+              accessibilityState={{ disabled: savingRecord }}
+              accessibilityLabel="분유와 상세 입력">
+              <FixedText style={styles.detailText}>분유</FixedText>
             </Pressable>
           </View>
-        ) : null}
-      </View>
+        </View>
 
-      <Link href="/feeding-form" asChild>
-        <Pressable style={styles.feedingButtonFlat} accessibilityRole="button">
-          <Text style={styles.addButtonText}>수유 기록</Text>
-        </Pressable>
-      </Link>
-
-      {/* 기저귀는 화면을 넘기지 않고 지금 시각으로 바로 남긴다. 하루에 가장 자주
+        {/* 기저귀는 화면을 넘기지 않고 지금 시각으로 바로 남긴다. 하루에 가장 자주
           하는 동작이라 두 번의 탭과 화면 전환이 그대로 비용이다. 시각을 고치거나
           메모를 남겨야 하면 `상세`로 기존 입력 화면에 들어간다. */}
-      <View style={styles.buttons}>
-        {DIAPER_KINDS.map((kind) => (
-          <Pressable
-            key={kind}
-            style={[styles.diaperQuickFlat, savingDiaper && styles.buttonBusy]}
-            onPress={() => void onQuickDiaper(kind)}
-            disabled={savingDiaper}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: savingDiaper }}
-            accessibilityLabel={`${DIAPER_SPOKEN_LABEL[kind]} 기록`}>
-            <Text style={styles.addButtonText}>{DIAPER_QUICK_LABEL[kind]}</Text>
-          </Pressable>
-        ))}
-        <Link href="/diaper-form" asChild>
-          {/* Link asChild는 스타일 배열을 받지 않는다. 미리 합쳐 둔 것 중 고른다. */}
-          <Pressable
-            style={savingDiaper ? styles.detailBusyFlat : styles.detailButtonFlat}
-            disabled={savingDiaper}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: savingDiaper }}
-            accessibilityLabel="기저귀 상세 입력">
-            <Text style={styles.detailText}>상세</Text>
-          </Pressable>
-        </Link>
-      </View>
-
-      <Pressable
-        style={sleepButtonStyle(styles, activeSleep !== null, sleepOverdue)}
-        onPress={onPressSleep}
-        disabled={toggling}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: toggling }}
-        accessibilityLabel={sleepAccessibilityLabel}>
-        <View style={styles.sleepMain}>
-          {/* 낮잠·밤잠을 구분하지 않는 수면 기록이므로 침대 아이콘을 쓴다. */}
-          <Ionicons
-            name="bed"
-            size={18}
-            color={activeSleep ? colors.onAccent : colors.sleepIconIdle}
-          />
-          <Text style={styles.addButtonText}>
-            {activeSleep ? `수면 중 · ${elapsedSleep}` : '수면 시작'}
-          </Text>
+        <View style={styles.quickGroup}>
+          <View style={styles.groupHeader}>
+            <View style={styles.barDiaperFlat} />
+            <FixedText style={styles.groupTitle}>기저귀 기록</FixedText>
+          </View>
+          <View style={styles.buttons}>
+            {DIAPER_KINDS.map((kind) => (
+              <Pressable
+                key={kind}
+                style={[styles.diaperQuickFlat, savingRecord && styles.buttonBusy]}
+                onPress={() => void onQuickDiaper(kind)}
+                disabled={savingRecord}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: savingRecord }}
+                accessibilityLabel={`${DIAPER_KIND_LABEL[kind]} 기록`}>
+                <FixedText style={styles.addButtonText}>{DIAPER_KIND_LABEL[kind]}</FixedText>
+              </Pressable>
+            ))}
+            {/* `Link asChild`를 쓰지 않는다. 래퍼 View가 flex를 받지 않아 이 버튼만
+              폭이 달라진다. 옆 셋과 같은 크기여야 한 줄로 읽힌다. */}
+            <Pressable
+              style={[styles.detailButtonFlat, savingRecord && styles.buttonBusy]}
+              disabled={savingRecord}
+              onPress={() => router.push('/diaper-form')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: savingRecord }}
+              accessibilityLabel="기저귀 상세 입력">
+              <FixedText style={styles.detailText}>상세</FixedText>
+            </Pressable>
+          </View>
         </View>
-        {/* 시작 시각과 12시간 안내 문구는 넣지 않는다. 여기서 알아야 할 것은
-            자는 중인지, 얼마나 됐는지, 어디를 눌러 끝내는지뿐이다.
-            시작 시각은 기록 탭에 있고, 12시간 초과는 버튼 배경색으로 알린다. */}
-        {activeSleep ? <Text style={styles.sleepEnd}>수면 종료</Text> : null}
-      </Pressable>
+
+        {/* 수면은 하루 2~4회라 모유·기저귀와 같은 무게일 이유가 없다. 제목과 행동을
+          한 줄로 묶어 상태는 왼쪽, 누를 것은 오른쪽 끝에 둔다.
+          상태와 버튼을 각각 읽도록 접근성 노드를 나눈다 — 하나로 묶으면
+          `수면 중 32분 수면 종료`가 한 덩어리로 낭독된다. */}
+        <View style={styles.sleepRowLine}>
+          <View
+            style={sleepCardStyle(styles, activeSleep !== null, sleepOverdue)}
+            accessible
+            accessibilityLabel={sleepStatusLabel}>
+            <Ionicons name="bed" size={18} color={colors.onAccent} />
+            <FixedText style={styles.sleepStateValue} numberOfLines={1}>
+              {sleepLine}
+            </FixedText>
+          </View>
+          {/* 상태 카드와 **형제**다. 카드 안에 넣으면 안쪽 여백 때문에 버튼이
+              잘리거나 줄어든다. 둘 다 65dp에 같은 상태색이라 한 덩어리로 읽히고,
+              떨어져 있어 오른쪽만 누르는 곳이라는 것도 보인다. */}
+          <Pressable
+            style={({ pressed }) => [
+              sleepButtonStyle(styles, activeSleep !== null, sleepOverdue),
+              (pressed || toggling) && styles.buttonBusy,
+            ]}
+            onPress={onPressSleep}
+            disabled={toggling}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: toggling }}
+            accessibilityLabel={activeSleep ? '수면 종료' : '수면 시작'}>
+            <FixedText style={styles.addButtonText}>{activeSleep ? '종료' : '시작'}</FixedText>
+          </Pressable>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -554,21 +598,45 @@ function createStyles(c: Colors) {
     cardHalf: { flex: 1 },
     cardLabel: { fontSize: 14, color: c.textMuted },
     cardValue: { fontSize: 32, fontWeight: '700', color: c.text },
+    // 오늘 수면·기저귀는 이 화면에서 가장 덜 중요한 숫자인데 경과 시간과 같은
+    // 크기였다. 큰 숫자는 `마지막 수유` 하나로 둔다.
+    cardValueSmall: { fontSize: 24, fontWeight: '700', color: c.text },
+    cardDivider: { height: 1, backgroundColor: c.border },
     cardSub: { fontSize: 15, color: c.textMuted },
     cardEmpty: { fontSize: 20, color: c.textPlaceholder, paddingVertical: 6 },
     buttons: { flexDirection: 'row', gap: 8 },
+    quickGroup: { gap: 6 },
+    // 제목이 보조 설명처럼 묻히지 않게 한다. 세로선은 높이를 거의 쓰지 않으면서
+    // 그룹 경계를 만들고, 그 줄의 색이 아래 버튼과 같아 무엇의 제목인지 바로 붙는다.
+    // 색만으로 구분하지 않고 글자가 함께 있으므로 색각과 무관하게 읽힌다.
+    groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    groupTitle: { fontSize: 16, fontWeight: '700', color: c.text },
+    groupBar: { width: 3, height: 16, borderRadius: 2, alignSelf: 'center' },
+    barFeeding: { backgroundColor: c.accent },
+    barDiaper: { backgroundColor: c.diaper },
     // 내용이 없어도 이 높이는 유지된다. 큰 글꼴에서 두 줄이 되면 늘어난다 —
     // 잘라내는 것보다 낫다.
-    savedSlot: { minHeight: 48, justifyContent: 'center' },
-    saved: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-    savedText: { flexShrink: 1, fontSize: 15, color: c.textMuted },
-    undoText: { fontSize: 15, fontWeight: '700', color: c.accentText },
+    quickArea: { gap: 12 },
     // 저장 중 표시. 비활성 컨트롤이라 대비 기준에서 빠진다.
     buttonBusy: { opacity: 0.5 },
-    // `상세`는 칠하지 않는다. 옆 셋과 같은 무게로 보이면 안 되고, 새 색 조합을
-    // 만들지 않아 대비 검사에 항목이 늘지 않는다.
-    detailButton: { flexGrow: 0, flexShrink: 0, flexBasis: 60, backgroundColor: 'transparent' },
+    // `상세`는 옆 셋보다 가볍게 둔다 — 즉시 저장이 아니라 입력 화면을 여는
+    // 버튼이라 같은 무게면 안 된다. 그래서 채운 색이 아니라 옅은 배경을 쓴다.
+    //
+    // **다만 테두리가 있어야 버튼이다.** 채움만으로는 `surfaceAccent`와 화면 배경의
+    // 대비가 라이트 1.03:1, 다크 1.45:1이라 경계가 보이지 않는다. 옆 기저귀
+    // 버튼은 4.81:1 / 3.91:1로 통과하는데 이것만 미달이었다.
+    // 테두리 `accentText`는 5.71:1 / 9.60:1이다.
+    //
+    // 행이 `alignItems: 'stretch'`라 테두리로 2px 커져도 네 버튼 높이는 같다.
+    // 네 버튼은 같은 폭이다. `상세`만 좁히면 한 줄 안에서 크기가 안 맞는다.
+    // 360dp에서 (320 - 24) / 4 = 74dp씩이라 `둘 다`도 큰 글꼴에서 들어간다.
+    detailButton: {
+      backgroundColor: c.surfaceAccent,
+      borderWidth: 1,
+      borderColor: c.accentText,
+    },
     detailText: { fontSize: 17, fontWeight: '700', color: c.accentText },
+    sideButton: { backgroundColor: c.accent },
     // flex는 가로 행 버튼에만. 세로 컨테이너의 직계 자식에 주면 남는 높이를
     // 전부 먹어 다른 카드를 덮는다.
     addButton: {
@@ -595,46 +663,58 @@ function createStyles(c: Colors) {
     // 기기에서 어긋난다.
     // flexDirection이 row가 되면 alignItems는 세로만 맡는다. 가로 가운데는
     // justifyContent가 한다. 진행 중 상태는 아래 space-between이 덮어쓴다.
-    sleepRow: {
+    // 상태 카드와 버튼이 **형제**다. 둘 다 같은 상태색이라 한 덩어리로 읽히고,
+    // 8dp 떨어져 있어 오른쪽만 누르는 곳이라는 것도 보인다. 예전 전폭 수면
+    // 버튼의 또렷한 상태 신호를 그대로 살린 모양이다.
+    // 투명한 래퍼. 색은 아래 두 형제가 각자 칠한다.
+    sleepRowLine: { flexDirection: 'row', gap: 8 },
+    sleepStatus: {
+      flex: 1,
+      height: 65,
+      borderRadius: 12,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
+      gap: 8,
+      paddingLeft: 12,
     },
-    sleepRowActive: { justifyContent: 'space-between', paddingHorizontal: 20 },
-    sleepMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    sleepEnd: { fontSize: 15, fontWeight: '700', color: c.onAccent },
+    sleepStateValue: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: c.onAccent },
+    // 위 `분유`·`상세`와 같은 80 × 65dp.
+    sleepAction: {
+      width: 80,
+      height: 65,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     addButtonText: { fontSize: 17, fontWeight: '700', color: c.onAccent },
   });
 
-  // <Link asChild>는 자식에게 스타일 배열을 넘기면 expo-router가 throw한다.
-  // 한 번만 합쳐서 단일 객체로 전달한다.
+  // 미리 합쳐 둔 버튼 스타일. 조합이 많아 호출부에서 배열을 만들면 읽기 어렵다.
   return {
     ...s,
-    feedingButtonFlat: StyleSheet.flatten([s.addButton]),
     diaperQuickFlat: StyleSheet.flatten([s.addButton, s.inRow, s.diaperButton]),
-    detailButtonFlat: StyleSheet.flatten([s.addButton, s.detailButton]),
-    detailBusyFlat: StyleSheet.flatten([s.addButton, s.detailButton, s.buttonBusy]),
-    sleepStartFlat: StyleSheet.flatten([s.addButton, s.sleepStartButton, s.sleepRow]),
-    sleepActiveFlat: StyleSheet.flatten([
-      s.addButton,
-      s.sleepActiveButton,
-      s.sleepRow,
-      s.sleepRowActive,
-    ]),
-    sleepOverdueFlat: StyleSheet.flatten([
-      s.addButton,
-      s.sleepOverdueButton,
-      s.sleepRow,
-      s.sleepRowActive,
-    ]),
+    detailButtonFlat: StyleSheet.flatten([s.addButton, s.inRow, s.detailButton]),
+    sideButtonFlat: StyleSheet.flatten([s.addButton, s.inRow, s.sideButton]),
+    barFeedingFlat: StyleSheet.flatten([s.groupBar, s.barFeeding]),
+    barDiaperFlat: StyleSheet.flatten([s.groupBar, s.barDiaper]),
+    sleepCardIdleFlat: StyleSheet.flatten([s.sleepStatus, s.sleepStartButton]),
+    sleepCardActiveFlat: StyleSheet.flatten([s.sleepStatus, s.sleepActiveButton]),
+    sleepCardOverdueFlat: StyleSheet.flatten([s.sleepStatus, s.sleepOverdueButton]),
+    sleepBtnIdleFlat: StyleSheet.flatten([s.sleepAction, s.sleepStartButton]),
+    sleepBtnActiveFlat: StyleSheet.flatten([s.sleepAction, s.sleepActiveButton]),
+    sleepBtnOverdueFlat: StyleSheet.flatten([s.sleepAction, s.sleepOverdueButton]),
     cardHalfFlat: StyleSheet.flatten([s.card, s.cardHalf]),
   };
 }
 
 type Styles = ReturnType<typeof createStyles>;
 
+function sleepCardStyle(styles: Styles, active: boolean, overdue: boolean) {
+  if (!active) return styles.sleepCardIdleFlat;
+  return overdue ? styles.sleepCardOverdueFlat : styles.sleepCardActiveFlat;
+}
+
 function sleepButtonStyle(styles: Styles, active: boolean, overdue: boolean) {
-  if (!active) return styles.sleepStartFlat;
-  return overdue ? styles.sleepOverdueFlat : styles.sleepActiveFlat;
+  if (!active) return styles.sleepBtnIdleFlat;
+  return overdue ? styles.sleepBtnOverdueFlat : styles.sleepBtnActiveFlat;
 }

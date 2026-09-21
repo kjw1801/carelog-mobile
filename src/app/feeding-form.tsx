@@ -27,6 +27,7 @@ import {
   type StoredFeedingInput,
 } from '@/db/feedings';
 import { parseAmount } from '@/lib/amount';
+import { showSuccessMessage } from '@/lib/feedback';
 import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
 import { type Colors } from '@/theme/colors';
 import { useColors } from '@/theme/useColors';
@@ -147,6 +148,7 @@ export default function FeedingFormScreen() {
     try {
       if (feedingId !== null) {
         await updateFeeding(db, feedingId, stored);
+        showSuccessMessage('수유 기록을 수정했습니다');
       } else if (stored.kind === 'unspecified') {
         // 새 기록은 위에서 종류를 강제하므로 여기에 오지 않는다. 캐스트 대신
         // 이 분기를 둬야 insertFeeding에 NewFeedingInput만 넘어가는 것이
@@ -154,6 +156,7 @@ export default function FeedingFormScreen() {
         throw new Error('새 기록에는 수유 종류가 있어야 한다');
       } else {
         await insertFeeding(db, stored);
+        showSuccessMessage('수유 기록을 저장했습니다');
       }
       router.back();
     } catch {
@@ -172,8 +175,18 @@ export default function FeedingFormScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          await deleteFeeding(db, feedingId);
-          router.back();
+          // `try`가 없으면 삭제가 실패했을 때 처리되지 않은 거부로 끝난다 —
+          // `router.back()`도 안 돌아 화면이 그대로 남고 아무 말도 없다.
+          try {
+            // 목록이 낡아 이미 지워진 행을 다시 지우면 `false`다. 그때
+            // "삭제했습니다"는 거짓말이므로 말하지 않는다.
+            if (await deleteFeeding(db, feedingId)) {
+              showSuccessMessage('수유 기록을 삭제했습니다');
+            }
+            router.back();
+          } catch {
+            Alert.alert('삭제하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+          }
         },
       },
     ]);

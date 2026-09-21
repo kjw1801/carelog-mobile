@@ -15,27 +15,21 @@ export type DiaperInput = {
   note: string | null;
 };
 
+/**
+ * 화면·낭독·Toast가 **한 벌을 같이 쓴다.** 예전에는 버튼용·목록용·낭독용을
+ * 따로 뒀는데, 그 갈라짐이 `소변과 대변 모두` + `으로` = "모두으로"를 만들었다.
+ *
+ * 그래서 두 가지를 지킨다.
+ * - 셋 다 **받침으로 끝난다** — `${DIAPER_KIND_LABEL[kind]}으로`처럼 조사를 붙인다.
+ * - 셋 다 **소리로만 들어도 뜻이 통한다** — `둘 다`는 무엇이 둘인지 알 수 없어 쓰지 않는다.
+ *
+ * `대소변`은 3글자라 원터치 버튼 한 줄에 들어가고, `+` 기호와 달리 낭독기가
+ * "더하기"로 읽지도 않는다.
+ */
 export const DIAPER_KIND_LABEL: Record<DiaperKind, string> = {
   pee: '소변',
   poo: '대변',
-  both: '소변+대변',
-};
-
-/**
- * 오늘 화면의 원터치 버튼 라벨. 셋이 한 줄에 들어가야 해서 `소변+대변`을 줄인다.
- * 기록 목록은 `DIAPER_KIND_LABEL`을 그대로 쓴다 — 훑어볼 때는 정확한 쪽이 낫다.
- * 낭독은 `소변과 대변 모두`로 온전히 준다.
- */
-export const DIAPER_QUICK_LABEL: Record<DiaperKind, string> = {
-  pee: '소변',
-  poo: '대변',
-  both: '둘 다',
-};
-
-export const DIAPER_SPOKEN_LABEL: Record<DiaperKind, string> = {
-  pee: '소변',
-  poo: '대변',
-  both: '소변과 대변 모두',
+  both: '대소변',
 };
 
 export const DIAPER_KINDS: DiaperKind[] = ['pee', 'poo', 'both'];
@@ -95,10 +89,10 @@ export async function updateDiaper(
 }
 
 /**
- * 지웠으면 `true`. 이미 없는 id면 `false`다 — `endSleep`과 같은 모양이다.
+ * 지웠으면 `true`. 이미 없는 id면 `false`다 — `deleteFeeding`·`endSleep`과 같다.
  *
- * 실행취소가 화면의 횟수를 내리기 전에 이걸 본다. 무조건 내리면 두 번 지워진
- * 기록에서 화면과 DB가 어긋난다.
+ * **폼의 성공 Toast가 이 값을 본다.** 목록이 낡아 이미 지워진 행을 다시 지우면
+ * 아무 일도 없었으므로 `기저귀 기록을 삭제했습니다`는 거짓말이 된다.
  */
 export async function deleteDiaper(db: SQLiteDatabase, id: number): Promise<boolean> {
   const result = await db.runAsync('DELETE FROM diapers WHERE id = ?', id);

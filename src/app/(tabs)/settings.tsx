@@ -19,6 +19,7 @@ import {
 
 import { getBaby, saveBaby } from '@/db/baby';
 import { formatCalendarDate, fromCalendarDate, toCalendarDate } from '@/lib/date';
+import { showSuccessMessage } from '@/lib/feedback';
 import { clampName } from '@/lib/name';
 import { type Colors } from '@/theme/colors';
 import { THEME_PREFERENCE_LABEL, THEME_PREFERENCES } from '@/theme/preference';
@@ -104,7 +105,7 @@ export default function SettingsScreen() {
       });
       // 저장한 값으로 입력창을 맞춘다. 앞뒤 공백을 넣었다면 화면과 DB가 어긋난다.
       setName(trimmed);
-      Alert.alert('저장했습니다');
+      showSuccessMessage('아이 정보를 저장했습니다');
     } catch {
       Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
     } finally {

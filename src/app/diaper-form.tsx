@@ -24,6 +24,7 @@ import {
   updateDiaper,
   type DiaperKind,
 } from '@/db/diapers';
+import { showSuccessMessage } from '@/lib/feedback';
 import { formatDay, formatTimeOfDay, mergePickedDateTime } from '@/lib/time';
 import { type Colors } from '@/theme/colors';
 import { useColors } from '@/theme/useColors';
@@ -88,8 +89,13 @@ export default function DiaperFormScreen() {
     savingRef.current = true;
     setSaving(true);
     try {
-      if (diaperId === null) await insertDiaper(db, input);
-      else await updateDiaper(db, diaperId, input);
+      if (diaperId === null) {
+        await insertDiaper(db, input);
+        showSuccessMessage('기저귀 기록을 저장했습니다');
+      } else {
+        await updateDiaper(db, diaperId, input);
+        showSuccessMessage('기저귀 기록을 수정했습니다');
+      }
       router.back();
     } catch {
       Alert.alert('저장하지 못했습니다', '잠시 후 다시 시도해 주세요.');
@@ -107,8 +113,18 @@ export default function DiaperFormScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          await deleteDiaper(db, diaperId);
-          router.back();
+          // `try`가 없으면 삭제가 실패했을 때 처리되지 않은 거부로 끝난다 —
+          // `router.back()`도 안 돌아 화면이 그대로 남고 아무 말도 없다.
+          try {
+            // 목록이 낡아 이미 지워진 행을 다시 지우면 `false`다. 그때
+            // "삭제했습니다"는 거짓말이므로 말하지 않는다.
+            if (await deleteDiaper(db, diaperId)) {
+              showSuccessMessage('기저귀 기록을 삭제했습니다');
+            }
+            router.back();
+          } catch {
+            Alert.alert('삭제하지 못했습니다', '잠시 후 다시 시도해 주세요.');
+          }
         },
       },
     ]);

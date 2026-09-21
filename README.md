@@ -68,7 +68,7 @@ React Native 0.86 / Expo SDK 57 / TypeScript / Expo Router / expo-sqlite
 
 ## 테스트와 검증
 
-- 단위 테스트 193개 (jest / jest-expo) — 날짜 경계, 수면 구간 병합, 수유량 파싱,
+- 단위 테스트 191개 (jest / jest-expo) — 날짜 경계, 수면 구간 병합, 수유량 파싱,
   시간 포맷, 일령 계산, 이름 길이 제한, 색상 대비, 테마 결정, 막대 비율,
   날짜별 집계, 수유 문구, 종류별 집계 SQL, 기저귀 저장·삭제 계약
 - 서머타임 전환일 검증은 `npm run test:dst`가 `TZ=America/New_York`로 따로 돌린다.

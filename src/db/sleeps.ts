@@ -97,6 +97,8 @@ export async function updateSleep(
   );
 }
 
-export async function deleteSleep(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM sleeps WHERE id = ?', id);
+/** 지운 행이 있으면 `true`. 목록이 낡아 이미 지워진 행을 다시 지우면 `false`다. */
+export async function deleteSleep(db: SQLiteDatabase, id: number): Promise<boolean> {
+  const result = await db.runAsync('DELETE FROM sleeps WHERE id = ?', id);
+  return result.changes > 0;
 }
