@@ -265,7 +265,10 @@ export default function TodayScreen() {
         try {
           const ended = await endSleep(db, activeSleep.id, Date.now());
           // 진행 중인 행만 UPDATE되므로, 낡은 상태로 눌렀으면 아무것도 안 바뀐다.
-          if (!ended) Alert.alert('이미 종료된 수면입니다');
+          // 그때는 순번을 올리지 않는다 — 바뀐 게 없고, 낡은 화면을 고칠 조회를
+          // 오히려 버리게 된다.
+          if (ended) writeSeq.current += 1;
+          else Alert.alert('이미 종료된 수면입니다');
         } catch {
           Alert.alert('수면을 종료하지 못했습니다', '잠시 후 다시 시도해 주세요.');
           return;
@@ -273,6 +276,7 @@ export default function TodayScreen() {
       } else {
         try {
           await startSleep(db, Date.now());
+          writeSeq.current += 1;
         } catch {
           // 유니크 인덱스가 진행 중 수면을 하나로 막으므로 중복 시작이 여기로 온다.
           // 잠김·연결 오류도 같은 자리로 오니, 실제 진행 중 기록이 있을 때만
@@ -288,6 +292,9 @@ export default function TodayScreen() {
             setTodaySleeps((prev) =>
               prev.some((row) => row.id === existing.id) ? prev : [...prev, existing]
             );
+            // 이것도 화면이 DB보다 앞서는 쓰기다. 먼저 출발한 조회가 덮으면
+            // 진행 중 수면이 사라져 버튼이 다시 `수면 시작`으로 돌아간다.
+            writeSeq.current += 1;
             Alert.alert('이미 진행 중인 수면이 있습니다', '먼저 종료해 주세요.');
           } else {
             Alert.alert('수면을 시작하지 못했습니다', '잠시 후 다시 시도해 주세요.');
