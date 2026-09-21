@@ -26,8 +26,8 @@ import { AccessibilityInfo, Platform, ToastAndroid } from 'react-native';
  */
 export function showSuccessMessage(message: string): void {
   if (Platform.OS === 'android') {
-    // 시스템 Toast의 접근성 처리에 맡기고 따로 낭독하지 않는다 — 중복해서 읽힐
-    // 수 있다. **기기·버전별 TalkBack 동작은 검증하지 않았다.**
+    // Android는 시스템 Toast의 접근성 처리를 사용한다.
+    // 별도 낭독은 중복될 수 있어 호출하지 않는다.
     ToastAndroid.show(message, ToastAndroid.SHORT);
     return;
   }
