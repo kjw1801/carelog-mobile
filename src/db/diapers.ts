@@ -56,10 +56,9 @@ export async function getDiaperCount(
   return row?.count ?? 0;
 }
 
-/** 원터치 저장의 실행취소가 **방금 만든 행만** 지울 수 있도록 id를 돌려준다. */
-export async function insertDiaper(db: SQLiteDatabase, input: DiaperInput): Promise<number> {
+export async function insertDiaper(db: SQLiteDatabase, input: DiaperInput): Promise<void> {
   const now = Date.now();
-  const result = await db.runAsync(
+  await db.runAsync(
     `INSERT INTO diapers (occurred_at, kind, note, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)`,
     input.occurredAt,
@@ -68,7 +67,6 @@ export async function insertDiaper(db: SQLiteDatabase, input: DiaperInput): Prom
     now,
     now
   );
-  return result.lastInsertRowId;
 }
 
 export async function updateDiaper(

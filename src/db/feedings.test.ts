@@ -1,6 +1,8 @@
 import {
   feedingDetail,
   getFeedingSummary,
+  getLastFeeding,
+  deleteFeeding,
   insertFeeding,
   todayFeedingLine,
   type FeedingSummary,
@@ -148,5 +150,36 @@ describe('getFeedingSummary', () => {
       formulaCount: 0,
       formulaMl: null,
     });
+  });
+});
+
+describe('insertFeeding / deleteFeeding', () => {
+  const breast = {
+    occurredAt: DAY + 1,
+    kind: 'breast',
+    side: 'left',
+    amountMl: null,
+    note: null,
+  } as const;
+
+  it('두 번째 DELETE는 false다', async () => {
+    const db = await memoryDb();
+    await insertFeeding(db, breast);
+    const id = (await getLastFeeding(db))?.id ?? 0;
+
+    await expect(deleteFeeding(db, id)).resolves.toBe(true);
+    // 여기서 true가 나오면 지운 것이 없는데도 `삭제했습니다`가 뜬다.
+    await expect(deleteFeeding(db, id)).resolves.toBe(false);
+  });
+
+  it('지우면 마지막 수유가 이전 기록으로 돌아간다', async () => {
+    const db = await memoryDb();
+    await insertFeeding(db, breast);
+    await insertFeeding(db, { ...breast, occurredAt: DAY + 2, side: 'right' });
+
+    const second = await getLastFeeding(db);
+    expect(second?.side).toBe('right');
+    await deleteFeeding(db, second?.id ?? 0);
+    expect((await getLastFeeding(db))?.side).toBe('left');
   });
 });
