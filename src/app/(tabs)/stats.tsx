@@ -2,7 +2,6 @@ import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useMemo, useState } from 'react';
 import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getRecentDayStats, type RecentStats } from '@/db/stats';
 import {
@@ -155,7 +154,7 @@ export default function StatsScreen() {
   const shared = { starts, todayStart, styles };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Chart
           {...shared}
@@ -192,12 +191,14 @@ export default function StatsScreen() {
           color={colors.sleepDot}
         />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function createStyles(c: Colors) {
   return StyleSheet.create({
+    // 하단 안전 영역은 탭 바가 이미 비운다. 여기서 또 비우면 마지막 차트 아래가
+    // 그만큼 버려진다(테스트 기기 3버튼 내비에서 약 48dp). 오늘 화면과 같은 원인이다.
     container: { flex: 1, backgroundColor: c.background },
     content: { padding: 16, gap: 8, paddingBottom: 12 },
     card: { backgroundColor: c.surface, borderRadius: 14, padding: 10, gap: 4 },
