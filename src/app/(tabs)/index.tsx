@@ -14,7 +14,6 @@ import {
   View,
   type TextProps,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBaby, type Baby } from '@/db/baby';
 import {
@@ -423,30 +422,37 @@ export default function TodayScreen() {
   }, [fullBabyName, displayBabyName, dayCount, styles]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <Tabs.Screen options={screenOptions} />
 
       <ScrollView style={styles.cards} contentContainerStyle={styles.cardsContent}>
-        {/* 수유는 한 카드다. 마지막 수유·오늘 횟수·분유량은 한 주제인데 자리
-            때문에 흩어져 있었다 — 분유량이 수면과 한 줄에 있을 이유가 없다.
-            큰 숫자는 경과 시간 하나뿐이다. 이 화면이 답하는 질문이 그것이다. */}
+        {/* 수유는 한 카드, **두 줄**이다 — 지금(경과 시간·마지막 기록)과 오늘 합계.
+            라벨·큰 숫자·구분선까지 다섯 줄로 쌓았더니 카드가 빠른 기록 영역을 밀어내
+            작은 화면에서 잘렸다. 한 줄로도 줄여 봤지만 글자가 너무 작아졌다.
+
+            줄마다 넘치면 줄을 바꾸지 않고 글자를 조금 줄인다. 줄을 바꾸면 카드 높이가
+            데이터마다 달라져 다시 잘린다. 낭독은 위 `feedingLabel`의 완전한 문장이다. */}
         <View style={styles.card} accessible accessibilityLabel={feedingLabel}>
-          <Text style={styles.cardLabel}>마지막 수유</Text>
           {last ? (
             <>
-              <Text style={styles.cardValue} numberOfLines={1}>
-                {formatElapsed(last.occurred_at, now)}
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}>
+                <Text style={styles.cardValue}>{formatElapsed(last.occurred_at, now)}</Text>
+                {` · ${formatTimeOfDay(last.occurred_at)} ${feedingDetail(last.kind, last.side, last.amount_ml)}`}
               </Text>
-              {/* 한 줄로 고정하지 않는다. 좁은 화면이나 큰 글꼴에서 잘리는 대신
-                  넘어가야 한다. */}
-              <Text style={styles.cardSub}>{lastDetail}</Text>
-              {/* 위 두 줄은 **지금**을 말하고 아래 줄은 **하루 합계**를 말한다.
-                  같은 크기·같은 색이라 한 덩어리로 읽혀서 선으로 나눈다. */}
-              <View style={styles.cardDivider} />
-              <Text style={styles.cardSub}>{todayLine}</Text>
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}>
+                {todayLine}
+              </Text>
             </>
           ) : (
-            <Text style={styles.cardEmpty}>기록 없음</Text>
+            <Text style={styles.cardEmpty}>수유 기록 없음</Text>
           )}
         </View>
 
@@ -454,18 +460,18 @@ export default function TodayScreen() {
           {/* 겹치는 수면이 하나도 없으면 0시간이 아니라 "기록 없음"이다.
               안 잔 것과 기록하지 않은 것은 다르다. */}
           <View style={styles.cardHalfFlat}>
-            <Text style={styles.cardLabel}>오늘 수면</Text>
+            <Text style={styles.cardText}>오늘 수면</Text>
             {todaySleeps.length === 0 ? (
               <Text style={styles.cardEmpty}>기록 없음</Text>
             ) : (
-              <Text style={styles.cardValueSmall} numberOfLines={1}>
+              <Text style={styles.cardValue} numberOfLines={1}>
                 {formatDurationCompact(sleepMs)}
               </Text>
             )}
           </View>
           <View style={styles.cardHalfFlat}>
-            <Text style={styles.cardLabel}>오늘 기저귀</Text>
-            <Text style={styles.cardValueSmall} numberOfLines={1}>
+            <Text style={styles.cardText}>오늘 기저귀</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
               {diaperCount}회
             </Text>
           </View>
@@ -578,13 +584,23 @@ export default function TodayScreen() {
           </Pressable>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function createStyles(c: Colors) {
   const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background, padding: 20, gap: 12 },
+    // 하단 안전 영역은 탭 바가 이미 비운다. 여기서 또 비우면 그 높이만큼
+    // 빠른 기록 아래가 버려지고 위 카드가 잘린다(테스트 기기 3버튼 내비에서 약 48dp).
+    // 아래 여백만 작게 둬서 빠른 기록이 탭 바 바로 위에 붙게 한다.
+    container: {
+      flex: 1,
+      backgroundColor: c.background,
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 12,
+      gap: 12,
+    },
     // 이름만 줄어들게 하는 두 조각 제목. 컨테이너가 `flexShrink: 1`이라 헤더가
     // 주는 폭 안에서 줄어들고, 그 줄어듦을 이름 쪽이 전부 받는다.
     headerTitle: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
@@ -595,16 +611,17 @@ function createStyles(c: Colors) {
     // 끝까지 내렸을 때 마지막 카드가 경계에 붙지 않도록 여백을 준다.
     cardsContent: { gap: 12, paddingBottom: 12 },
     cardRow: { flexDirection: 'row', gap: 12 },
-    card: { backgroundColor: c.surface, borderRadius: 14, padding: 16, gap: 4 },
+    // 세 카드가 **한 벌**을 쓴다. 따로 두었더니 수유 카드만 줄인 뒤 반폭 카드의
+    // 숫자(24)가 경과 시간(20)보다 커져 위계가 뒤집혔다.
+    card: { backgroundColor: c.surface, borderRadius: 14, padding: 12, gap: 4 },
     cardHalf: { flex: 1 },
-    cardLabel: { fontSize: 14, color: c.textMuted },
-    cardValue: { fontSize: 32, fontWeight: '700', color: c.text },
-    // 오늘 수면·기저귀는 이 화면에서 가장 덜 중요한 숫자인데 경과 시간과 같은
-    // 크기였다. 큰 숫자는 `마지막 수유` 하나로 둔다.
-    cardValueSmall: { fontSize: 24, fontWeight: '700', color: c.text },
-    cardDivider: { height: 1, backgroundColor: c.border },
-    cardSub: { fontSize: 15, color: c.textMuted },
-    cardEmpty: { fontSize: 20, color: c.textPlaceholder, paddingVertical: 6 },
+    // 값 — 굵게는 이것 하나다. 보조 글자까지 굵게 하면 경과 시간과 한 덩어리로 보인다.
+    cardValue: { fontSize: 20, fontWeight: '700', color: c.text },
+    // 라벨과 보조 문구. `textMuted`가 아니라 `textLabel`이다 — 다크에서 `textMuted`(5.9:1)를
+    // 얇게 쓰니 흐려서 읽히지 않았다. 크기보다 색이 원인이었다.
+    cardText: { fontSize: 16, color: c.textLabel },
+    // 값과 같은 크기라 `기록 없음`이어도 카드 높이가 같다.
+    cardEmpty: { fontSize: 20, color: c.textPlaceholder },
     buttons: { flexDirection: 'row', gap: 8 },
     quickGroup: { gap: 6 },
     // 제목이 보조 설명처럼 묻히지 않게 한다. 세로선은 높이를 거의 쓰지 않으면서
